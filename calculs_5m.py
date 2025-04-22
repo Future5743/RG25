@@ -14,12 +14,12 @@ from shapely.geometry import Point, LineString, Polygon
 from tqdm import tqdm
 
 # Stocke le chemin d'accès du fichier shapefile "Buffer (large) des cratères" dans une variable.
-crater_shapefile_path = 'C:/Users/calg2564/PycharmProjects/pythonProject/'
+crater_shapefile_path = '/data/Buffer_crateres/Buffer_RG2'
 # Lecture de la variable précédente à l'aide de Géopandas. Devient un GeoDataFrame (permet la visualisation et la manipulation du fichier)
 craters = gpd.read_file(crater_shapefile_path)
 
 # Stocke le chemin d'accès du fichier raster "Modèle Numérique de Terrain" dans une variable.
-raster_path = 'C:/Users/calg2564/PycharmProjects/pythonProject/MNT_entree/NAC_DTM_REINER.TIF'
+raster_path = "/data/DTM/DTM_2m/NAC_DTM_REINER2.TIF"
 
 # Initialisation d'une liste pour stocker la geometry 'point' avec son information d'altitude. Direction depuis l'origine : verticale 360°
 # highest_points = []
