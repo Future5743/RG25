@@ -3,6 +3,8 @@
 # Import de la bibliothèque python "Geopandas". Permet de manipuler des données géographiques.
 import geopandas as gpd
 
+import skimage as sk
+
 import rasterio
 
 from rasterio.mask import mask
@@ -12,6 +14,8 @@ import numpy as np
 from shapely.geometry import Point, LineString, Polygon
 
 from tqdm import tqdm
+
+
 
 # Stocke le chemin d'accès du fichier shapefile "Buffer (large) des cratères" dans une variable.
 crater_shapefile_path = 'data/Buffer_crateres/Buffer_RG2/'
@@ -71,6 +75,57 @@ with rasterio.open(raster_path) as src:
             min_val = round(masked_image.min(), 4)
             min_pos = np.unravel_index(masked_image.argmin(), masked_image.shape)
 
+        angle = 0
+        D = masked_image.shape[1] * 2 ### D =  Diamietre du buffer
+
+        max_value = []
+        max_coord = []
+        max_geom = []
+        for i in range(36) :
+
+            angle += 10
+
+            print("#####", angle, "#####")
+
+            angle_rad = np.deg2rad(angle)
+
+            x0, y0 = min_pos[1], min_pos[2]
+
+            x1 = int(x0 + D * np.cos(angle))
+            y1 = int(y0 + D * np.sin(angle))
+
+            rr, cc = sk.draw.line(x0, y0, x1, y1)
+
+            while True :
+                try :
+                    masked_image[0, rr, cc]
+                    break
+                except :
+                    rr = rr[:-1]
+                    cc = cc[:-1]
+
+            line_value = masked_image[0, rr, cc]
+
+            max_value.append(np.max(line_value))
+
+            index_max = np.where(masked_image[0, rr, cc] == np.max(line_value))
+
+            max_coordinates = (rr[index_max][0], cc[index_max][0])
+
+            max_real_coordinates = rasterio.transform.xy(out_transform, max_coordinates[0], max_coordinates[1])
+
+            max_coord.append(max_real_coordinates)
+
+            max_geom.append(Point(max_real_coordinates[0], max_real_coordinates[1]))
+
+        print(max_value)
+        print(max_coord)
+        print(max_geom)
+        print(len(max_coord))
+
+
+
+'''
 # ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
 
     # Pour la ligne de pixels extraite, trouver les valeurs des colonnes à droite de la position minimale dans la même ligne
@@ -170,6 +225,7 @@ with rasterio.open(raster_path) as src:
 
             # Créer un objet Point
             point_haut_vert_180 = Point(max_x_bas, max_y_bas)
+'''
 
 # CIRCULARITE Distance entre points haut opposés
     # Profil vertical
