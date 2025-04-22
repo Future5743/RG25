@@ -14,30 +14,30 @@ from shapely.geometry import Point, LineString, Polygon
 from tqdm import tqdm
 
 # Stocke le chemin d'accès du fichier shapefile "Buffer (large) des cratères" dans une variable.
-crater_shapefile_path = '/data/Buffer_crateres/Buffer_RG2'
+crater_shapefile_path = 'data/Buffer_crateres/Buffer_RG2/'
 # Lecture de la variable précédente à l'aide de Géopandas. Devient un GeoDataFrame (permet la visualisation et la manipulation du fichier)
 craters = gpd.read_file(crater_shapefile_path)
 
 # Stocke le chemin d'accès du fichier raster "Modèle Numérique de Terrain" dans une variable.
-raster_path = "/data/DTM/DTM_2m/NAC_DTM_REINER2.TIF"
+raster_path = "data/DTM/NAC_DTM_REINER.tiff"
 
 # Initialisation d'une liste pour stocker la geometry 'point' avec son information d'altitude. Direction depuis l'origine : verticale 360°
-# highest_points = []
+highest_points = []
 
 # Liste pour stocker les informations nécessaires concernant la pente entre les bords opposés d'un cratère
-#results_pente = []
+results_pente = []
 
 # Liste pour stocker les informations nécessaires concernant la circularité d'un cratère et ce pour l'ensemble des cratères sélectionnés
-# results_circularite = []
+results_circularite = []
 
 # Géométrie des cratères finaux
-# result_geom_select_crat = []
+result_geom_select_crat = []
 
 # Liste pour stocker les informations nécessaires concernant le calcul final du ratio dD de chaque cratères
-# results_ratio_dD = []
+results_ratio_dD = []
 
 # Liste pour stocker l'information 'on-swirl' ou 'off-swirl'
-# swirl = []
+swirl = []
 
 # Force l'affichage complet d'un tableau numpy
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
@@ -51,13 +51,13 @@ with rasterio.open(raster_path) as src:
     no_data_value = src.nodata
 
     # Pour chaque cratère (polygone de cercle)
-     for _, crater in tqdm(craters.iterrows()):
-         # Extraire la géométrie du polygone, son identifiant unique et autres données attributaires
-         geometry_cr =   [crater['geometry']]
-         id =            crater['run_ID']
-         nac_id =        crater['NAC_DTM_ID']
-         center_x_dl =   crater['center_lon']
-         center_y_dl =   crater['center_lat']
+    for _, crater in tqdm(craters.iterrows()):
+        # Extraire la géométrie du polygone, son identifiant unique et autres données attributaires
+        geometry_cr =   [crater['geometry']]
+        id =            crater['run_ID']
+        nac_id =        crater['NAC_DTM_ID']
+        center_x_dl =   crater['center_lon']
+        center_y_dl =   crater['center_lat']
 
         # Découper le raster en utilisant le polygone
         out_image, out_transform = mask(src, geometry_cr, crop=True)
@@ -334,7 +334,7 @@ with rasterio.open(raster_path) as src:
 # Créer un GeoDataFrame avec les coordonnées GPS des cercles répondant à l'ensemble des critères de sélection des cratères pour l'étude du ratio d/D
 gdf = gpd.GeoDataFrame(result_geom_select_crat, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'C:/Users/calg2564/PycharmProjects/pythonProject/RG_5-6-7-8/deepL_RG_5-6-7-8/donnes_sorties/RG8/results_geom_08_40m_RG8_v2.shp'
+shapefile_path = 'results/RG2/results_geom_08_40m_RG8_v2.shp'
 gdf.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points bas
@@ -346,7 +346,7 @@ gdf.to_file(shapefile_path)
 # Créer un GeoDataFrame avec les coordonnées GPS des points hauts
 gdf_haut_rg = gpd.GeoDataFrame(highest_points, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'C:/Users/calg2564/PycharmProjects/pythonProject/RG_5-6-7-8/deepL_RG_5-6-7-8/donnes_sorties/RG8/results_haut_RG8_v2.shp'
+shapefile_path = 'results/RG2/results_geom_08_40m_RG8_v2.shp'
 gdf_haut_rg.to_file(shapefile_path)
 
 # Pente en CSV
