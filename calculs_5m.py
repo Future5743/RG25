@@ -79,7 +79,7 @@ with rasterio.open(raster_path) as src:
         D = masked_image.shape[1] * 2 ### D =  Diamietre du buffer
 
         max_value = []
-        max_coord = []
+        max_coord_relative = []
         max_geom = []
         for i in range(36) :
 
@@ -112,20 +112,18 @@ with rasterio.open(raster_path) as src:
 
             max_coordinates = (rr[index_max][0], cc[index_max][0])
 
-            max_real_coordinates = rasterio.transform.xy(out_transform, max_coordinates[0], max_coordinates[1])
+            max_coord_relative.append(max_coordinates)
 
-            max_coord.append(max_real_coordinates)
+            max_real_coordinates = rasterio.transform.xy(out_transform, max_coordinates[0], max_coordinates[1])
 
             max_geom.append(Point(max_real_coordinates[0], max_real_coordinates[1]))
 
         print(max_value)
-        print(max_coord)
+        print(max_coord_relative)
         print(max_geom)
         print(len(max_coord))
 
 
-
-'''
 # ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
 
     # Pour la ligne de pixels extraite, trouver les valeurs des colonnes à droite de la position minimale dans la même ligne
@@ -225,9 +223,23 @@ with rasterio.open(raster_path) as src:
 
             # Créer un objet Point
             point_haut_vert_180 = Point(max_x_bas, max_y_bas)
-'''
+
 
 # CIRCULARITE Distance entre points haut opposés
+        D = []
+
+        # Calcul des differents valeurs de diametres
+        def calcul_diametre(pos1, pos2, pixel_size_tb = 5) :
+
+            pixel_dist_tb = np.sqrt((pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2)
+
+            return pixel_dist_tb
+
+        for i in range(len(max_coord_relative)/2) :
+            D.append(calcul_diametre(max_coord_relative[i], max_coord_relative[i+23]))
+
+
+
     # Profil vertical
         # Calcul de la distance euclidienne en pixels entre max_pos_bas et max_pos_top et la convertir en mètres
         def calculate_pixel_distance_tb(pos1tb, pos2tb, pixel_size_tb=5):
