@@ -23,10 +23,18 @@ crater_shapefile_path = 'data/Buffer_crateres/Buffer_RG2/'
 craters = gpd.read_file(crater_shapefile_path)
 
 # Stocke le chemin d'accès du fichier raster "Modèle Numérique de Terrain" dans une variable.
-raster_path = "data/DTM/NAC_DTM_REINER.tiff"
+raster_path = "../data/DTM/NAC_DTM_REINER.tiff"
 
 # Initialisation d'une liste pour stocker la geometry 'point' avec son information d'altitude. Direction depuis l'origine : verticale 360°
 highest_points = []
+
+lowest_points = []
+
+profil_90 = []
+
+limit_points = []
+
+Lignes_visualisation = []
 
 # Liste pour stocker les informations nécessaires concernant la pente entre les bords opposés d'un cratère
 results_pente = []
@@ -76,23 +84,30 @@ with rasterio.open(raster_path) as src:
             min_pos = np.unravel_index(masked_image.argmin(), masked_image.shape)
 
         angle = 0
+
         D = masked_image.shape[1] * 2 ### D =  Diamietre du buffer
 
+
+# ELEVATION HAUTE
         max_value = []
         max_coord_relative = []
         max_geom = []
-        for i in range(36) :
+        limit = []
+        ligne_geom = []
 
+
+        x0, y0 = min_pos[1], min_pos[2]
+        for i in range(36) :
             angle += 10
 
-            print("#####", angle, "#####")
+            # print("#####", angle, "#####")
 
             angle_rad = np.deg2rad(angle)
 
             x0, y0 = min_pos[1], min_pos[2]
 
-            x1 = int(x0 + D * np.cos(angle))
-            y1 = int(y0 + D * np.sin(angle))
+            x1 = int(x0 + D * np.cos(angle_rad))
+            y1 = int(y0 + D * np.sin(angle_rad))
 
             rr, cc = sk.draw.line(x0, y0, x1, y1)
 
@@ -104,298 +119,371 @@ with rasterio.open(raster_path) as src:
                     rr = rr[:-1]
                     cc = cc[:-1]
 
+
+
             line_value = masked_image[0, rr, cc]
 
-            max_value.append(np.max(line_value))
+            if line_value.shape[0] > 3 :
 
-            index_max = np.where(masked_image[0, rr, cc] == np.max(line_value))
+                maximum = np.max(line_value)
 
-            max_coordinates = (rr[index_max][0], cc[index_max][0])
+                while maximum == line_value[-1] or maximum == line_value[-2] or maximum == line_value[-3]:
 
-            max_coord_relative.append(max_coordinates)
+                    index = np.where(line_value == maximum)
 
-            max_real_coordinates = rasterio.transform.xy(out_transform, max_coordinates[0], max_coordinates[1])
+                    line_value[index] = - np.inf
 
-            max_geom.append(Point(max_real_coordinates[0], max_real_coordinates[1]))
+                    maximum = np.max(line_value)
 
-        print(max_value)
-        print(max_coord_relative)
-        print(max_geom)
-        print(len(max_coord))
+                if maximum != min_val :
+                    max_value.append(maximum)
 
+                    index_max = np.where(masked_image[0, rr, cc] == maximum)
 
-# ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
+                    max_coordinates = (rr[index_max][0], cc[index_max][0])
 
-    # Pour la ligne de pixels extraite, trouver les valeurs des colonnes à droite de la position minimale dans la même ligne
-        # Index de la ligne où se trouve l'altitude la plus basse
-        row_index = min_pos[1]
-        # Extraction de la ligne à partir de la position min_pos vers la droite
-        line = masked_image[0, row_index, min_pos[2]:]
+                    max_coord_relative.append(max_coordinates)
 
-        # Filtrer les valeurs "no data" de la ligne
-        line_values_rg = line[line != no_data_value]
+                    max_real_coordinates = rasterio.transform.xy(out_transform, max_coordinates[0], max_coordinates[1])
 
-        if line_values_rg.size > 0:
-            # Trouver l'altitude la plus haute dans la ligne filtrée
-            max_val_right = line_values_rg.max()  # Trouver l'altitude la plus haute dans cette ligne
-            max_pos_right = (row_index, min_pos[2] + np.where(line == max_val_right)[0][0])  # Calculer la position de l'altitude la plus haute
+                    max_geom.append(Point(max_real_coordinates[0], max_real_coordinates[1]))
 
-            # Vérifier si c'est la dernière valeur de la ligne
-            derniere_val_line = np.where(line == max_val_right)[0][0]
-            range_dern_val_line = derniere_val_line in {len(line) - 1, len(line) - 2, len(line) - 3}
+                    ligne_coord1 = rasterio.transform.xy(out_transform, rr[0], cc[0])
+                    ligne_coord2 = rasterio.transform.xy(out_transform, rr[-1], cc[-1])
 
-            # Convertir les indices en coordonnées réelles
-            max_x_rg, max_y_rg = rasterio.transform.xy(out_transform, max_pos_right[0], max_pos_right[1])
+                    min_geom = Point(ligne_coord1[0], ligne_coord1[1])
+                    ligne_geom.append(LineString([ligne_coord1, ligne_coord2]))
 
-            # Créer un objet Point
-            point_haut_horiz_90 = Point(max_x_rg, max_y_rg)
+                    limit.append(Point(ligne_coord2[0], ligne_coord2[1]))
 
-            # Ajouter le point avec l'altitude la plus basse à la liste
-            # highest_points.append({'geometry': point_haut_horiz_90, 'max_altitude_right': max_val_right, 'run_id': id, 'NAC_DTM_ID': nac_id})
-
-# ELEVATION HAUTE : Horizontal - 270° (vers la gauche dans le plan en 2-Dimensions)
-        # Trouver les valeurs des colonnes à droite de la position minimale dans la même ligne
-        line_lf = masked_image[0, row_index, :min_pos[2] + 1]  # Extraire la ligne à partir de la position min_pos vers la gauche
-
-        # Filtrer les valeurs "no data" de la ligne
-        line_values_lf = line_lf[line_lf != no_data_value]
-
-        if line_values_lf.size > 0:
-            # Trouver l'altitude la plus haute dans la ligne filtrée
-            max_val_left = line_values_lf.max()  # Trouver l'altitude la plus haute dans cette ligne
-            max_pos_left = (row_index, np.where(line_lf == max_val_left)[0][0])  # Calculer la position de l'altitude la plus haute
-
-            # Vérifier si c'est la première valeur de la ligne
-            premiere_val_line = np.where(line_lf == max_val_left)[0][0]
-            range_prem_val_line = premiere_val_line in {0, 1, 2}
-
-            # Convertir les indices en coordonnées réelles
-            max_x_lf, max_y_lf = rasterio.transform.xy(out_transform, max_pos_left[0], max_pos_left[1])
-
-            # Créer un objet Point
-            point_haut_horiz_270 = Point(max_x_lf, max_y_lf)
-
-# ELEVATION HAUTE : Vertical - 360° (vers le haut dans le plan en 2-Dimensions)
-        # Trouver les valeurs des colonnes en haut de la position minimale dans la même colonne
-        col_top_index = min_pos[2]  # Index de la colonne où se trouve l'altitude la plus basse
-        col_top = masked_image[0, :min_pos[1] + 1, col_top_index]  # Extraire la colonne à partir de la position min_pos vers le haut
-
-        # Filtrer les valeurs "no data" de la ligne
-        col_values_top = col_top[col_top != no_data_value]
-
-        if col_values_top.size > 0:
-            # Trouver l'altitude la plus haute dans la ligne filtrée
-            max_val_top = col_values_top.max()  # Trouver l'altitude la plus haute dans cette ligne
-            max_pos_top = (np.where(col_top == max_val_top)[0][0], col_top_index)  # Calculer la position de l'altitude la plus haute
-
-            # Vérifier si c'est la première valeur de la colonne
-            premiere_val_col = np.where(col_top == max_val_top)[0][0]
-            range_prem_val_col = premiere_val_col in {0, 1, 2}
-
-            # Convertir les indices en coordonnées réelles
-            max_x_top, max_y_top = rasterio.transform.xy(out_transform, max_pos_top[0], max_pos_top[1])
-
-            # Créer un objet Point
-            point_haut_vert_360 = Point(max_x_top, max_y_top)
-
-            # Ajouter le point avec l'altitude la plus basse à la liste
-            # highest_points.append({'geometry': point_haut_vert_360, 'max_altitude_right': max_val_top, 'run_id': id, 'NAC_DTM_ID': nac_id})
-
-# ELEVATION HAUTE : Vertical - 180° (vers le bas dans le plan en 2-Dimensions)
-        # Trouver les valeurs des lignes en dessous de la position minimale dans la même colonne
-        col_bas_index = min_pos[2]  # Index de la colonne où se trouve l'altitude la plus basse
-        col_bas = masked_image[0, min_pos[1]:, col_bas_index]  # Extraire la colonne à partir de la position min_pos vers le bas
-
-        # Filtrer les valeurs "no data" de la colonne
-        col_values_bas = col_bas[col_bas != no_data_value]
-
-        if col_values_bas.size > 0:
-            # Trouver l'altitude la plus haute dans la colonne filtrée
-            max_val_bas = col_values_bas.max()  # Trouver l'altitude la plus haute dans cette colonne
-            max_pos_bas = (min_pos[1] + np.where(col_bas == max_val_bas)[0][0], col_bas_index)  # Calculer la position de l'altitude la plus haute
-
-            # Vérifier si c'est la dernière valeur de la colonne
-            derniere_val_col = np.where(col_bas == max_val_bas)[0][0]
-            range_derniere_val_col = derniere_val_col in {len(col_bas) - 1, len(col_bas) - 2, len(col_bas) - 3}
-
-            # Convertir les indices en coordonnées réelles
-            max_x_bas, max_y_bas = rasterio.transform.xy(out_transform, max_pos_bas[0], max_pos_bas[1])
-
-            # Créer un objet Point
-            point_haut_vert_180 = Point(max_x_bas, max_y_bas)
+        if len(max_geom) == 36 :
+            # print(max_value)
+            # print(max_coord_relative)
+            # print(max_geom)
+            # print(ligne_geom)
 
 
-# CIRCULARITE Distance entre points haut opposés
-        D = []
+    # ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
 
-        # Calcul des differents valeurs de diametres
-        def calcul_diametre(pos1, pos2, pixel_size_tb = 5) :
+        # Pour la ligne de pixels extraite, trouver les valeurs des colonnes à droite de la position minimale dans la même ligne
+            # Index de la ligne où se trouve l'altitude la plus basse
+            row_index = min_pos[1]
+            # Extraction de la ligne à partir de la position min_pos vers la droite
+            line = masked_image[0, row_index, min_pos[2]:]
 
-            pixel_dist_tb = np.sqrt((pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2)
+            # Filtrer les valeurs "no data" de la ligne
+            line_values_rg = line[line != no_data_value]
 
-            return pixel_dist_tb
+            if line_values_rg.size > 0:
+                # Trouver l'altitude la plus haute dans la ligne filtrée
+                max_val_right = line_values_rg.max()  # Trouver l'altitude la plus haute dans cette ligne
+                max_pos_right = (row_index, min_pos[2] + np.where(line == max_val_right)[0][0])  # Calculer la position de l'altitude la plus haute
 
-        for i in range(len(max_coord_relative)/2) :
-            D.append(calcul_diametre(max_coord_relative[i], max_coord_relative[i+23]))
+                # Vérifier si c'est la dernière valeur de la ligne
+                derniere_val_line = np.where(line == max_val_right)[0][0]
+                range_dern_val_line = derniere_val_line in {len(line) - 1, len(line) - 2, len(line) - 3}
+
+                # Convertir les indices en coordonnées réelles
+                max_x_rg, max_y_rg = rasterio.transform.xy(out_transform, max_pos_right[0], max_pos_right[1])
+
+                # Créer un objet Point
+                point_haut_horiz_90 = Point(max_x_rg, max_y_rg)
+
+                # Ajouter le point avec l'altitude la plus basse à la liste
+                # highest_points.append({'geometry': point_haut_horiz_90, 'max_altitude_right': max_val_right, 'run_id': id, 'NAC_DTM_ID': nac_id})
+
+    # ELEVATION HAUTE : Horizontal - 270° (vers la gauche dans le plan en 2-Dimensions)
+            # Trouver les valeurs des colonnes à droite de la position minimale dans la même ligne
+            line_lf = masked_image[0, row_index, :min_pos[2] + 1]  # Extraire la ligne à partir de la position min_pos vers la gauche
+
+            # Filtrer les valeurs "no data" de la ligne
+            line_values_lf = line_lf[line_lf != no_data_value]
+
+            if line_values_lf.size > 0:
+                # Trouver l'altitude la plus haute dans la ligne filtrée
+                max_val_left = line_values_lf.max()  # Trouver l'altitude la plus haute dans cette ligne
+                max_pos_left = (row_index, np.where(line_lf == max_val_left)[0][0])  # Calculer la position de l'altitude la plus haute
+
+                # Vérifier si c'est la première valeur de la ligne
+                premiere_val_line = np.where(line_lf == max_val_left)[0][0]
+                range_prem_val_line = premiere_val_line in {0, 1, 2}
+
+                # Convertir les indices en coordonnées réelles
+                max_x_lf, max_y_lf = rasterio.transform.xy(out_transform, max_pos_left[0], max_pos_left[1])
+
+                # Créer un objet Point
+                point_haut_horiz_270 = Point(max_x_lf, max_y_lf)
+
+    # ELEVATION HAUTE : Vertical - 360° (vers le haut dans le plan en 2-Dimensions)
+            # Trouver les valeurs des colonnes en haut de la position minimale dans la même colonne
+            col_top_index = min_pos[2]  # Index de la colonne où se trouve l'altitude la plus basse
+            col_top = masked_image[0, :min_pos[1] + 1, col_top_index]  # Extraire la colonne à partir de la position min_pos vers le haut
+
+            # Filtrer les valeurs "no data" de la ligne
+            col_values_top = col_top[col_top != no_data_value]
+
+            if col_values_top.size > 0:
+                # Trouver l'altitude la plus haute dans la ligne filtrée
+                max_val_top = col_values_top.max()  # Trouver l'altitude la plus haute dans cette ligne
+                max_pos_top = (np.where(col_top == max_val_top)[0][0], col_top_index)  # Calculer la position de l'altitude la plus haute
+
+                # Vérifier si c'est la première valeur de la colonne
+                premiere_val_col = np.where(col_top == max_val_top)[0][0]
+                range_prem_val_col = premiere_val_col in {0, 1, 2}
+
+                # Convertir les indices en coordonnées réelles
+                max_x_top, max_y_top = rasterio.transform.xy(out_transform, max_pos_top[0], max_pos_top[1])
+
+                # Créer un objet Point
+                point_haut_vert_360 = Point(max_x_top, max_y_top)
+
+                # Ajouter le point avec l'altitude la plus basse à la liste
+                # highest_points.append({'geometry': point_haut_vert_360, 'max_altitude_right': max_val_top, 'run_id': id, 'NAC_DTM_ID': nac_id})
+
+    # ELEVATION HAUTE : Vertical - 180° (vers le bas dans le plan en 2-Dimensions)
+            # Trouver les valeurs des lignes en dessous de la position minimale dans la même colonne
+            col_bas_index = min_pos[2]  # Index de la colonne où se trouve l'altitude la plus basse
+            col_bas = masked_image[0, min_pos[1]:, col_bas_index]  # Extraire la colonne à partir de la position min_pos vers le bas
+
+            # Filtrer les valeurs "no data" de la colonne
+            col_values_bas = col_bas[col_bas != no_data_value]
+
+            if col_values_bas.size > 0:
+                # Trouver l'altitude la plus haute dans la colonne filtrée
+                max_val_bas = col_values_bas.max()  # Trouver l'altitude la plus haute dans cette colonne
+                max_pos_bas = (min_pos[1] + np.where(col_bas == max_val_bas)[0][0], col_bas_index)  # Calculer la position de l'altitude la plus haute
+
+                # Vérifier si c'est la dernière valeur de la colonne
+                derniere_val_col = np.where(col_bas == max_val_bas)[0][0]
+                range_derniere_val_col = derniere_val_col in {len(col_bas) - 1, len(col_bas) - 2, len(col_bas) - 3}
+
+                # Convertir les indices en coordonnées réelles
+                max_x_bas, max_y_bas = rasterio.transform.xy(out_transform, max_pos_bas[0], max_pos_bas[1])
+
+                # Créer un objet Point
+                point_haut_vert_180 = Point(max_x_bas, max_y_bas)
 
 
+    # DIAMETRES
+            D = []
 
-    # Profil vertical
-        # Calcul de la distance euclidienne en pixels entre max_pos_bas et max_pos_top et la convertir en mètres
-        def calculate_pixel_distance_tb(pos1tb, pos2tb, pixel_size_tb=5):
+            # Calcul des differents valeurs de diametres
+            def calcul_distance(pos1, pos2, pixel_size_tb = 5) :
 
-            # Calculer la distance euclidienne en pixels
-            pixel_distance_tb = np.sqrt((pos2tb[0] - pos1tb[0]) ** 2 + (pos2tb[1] - pos1tb[1]) ** 2)
+                pixel_dist_tb = np.sqrt((pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2)
 
-            # Convertir la distance en mètres
-            distance_in_meters_tb = pixel_distance_tb * pixel_size_tb
-            return distance_in_meters_tb
+                distance_in_meters_tb = pixel_dist_tb * pixel_size_tb
 
-        # Conversion de la distance euclidienne en mètres
-        distance_bas_top = calculate_pixel_distance_tb(max_pos_bas, max_pos_top)
+                return distance_in_meters_tb
 
-    # Profil horizontal
-        # Calcul de la distance euclidienne en pixels entre max_pos_right et max_pos_left et la convertir en mètres
-        def calculate_pixel_distance_lr(pos1lr, pos2lr, pixel_size_lr=5):
+            for i in range(int(len(max_coord_relative)/2)) :
+                D.append(calcul_distance(max_coord_relative[i], max_coord_relative[i+18]))
 
-            # Calculer la distance euclidienne en pixels
-            pixel_distance_lr = np.sqrt((pos2lr[0] - pos1lr[0]) ** 2 + (pos2lr[1] - pos1lr[1]) ** 2)
+            D = np.array(D)
+
+            moy_diam = round(np.mean(D), 2)
+
+        # Profil vertical
+            # Calcul de la distance euclidienne en pixels entre max_pos_bas et max_pos_top et la convertir en mètres
+            def calculate_pixel_distance_tb(pos1tb, pos2tb, pixel_size_tb=5):
+
+                # Calculer la distance euclidienne en pixels
+                pixel_distance_tb = np.sqrt((pos2tb[0] - pos1tb[0]) ** 2 + (pos2tb[1] - pos1tb[1]) ** 2)
+
+                # Convertir la distance en mètres
+                distance_in_meters_tb = pixel_distance_tb * pixel_size_tb
+                return distance_in_meters_tb
 
             # Conversion de la distance euclidienne en mètres
-            distance_in_meters_lr = pixel_distance_lr * pixel_size_lr
-            return distance_in_meters_lr
+            distance_bas_top = calculate_pixel_distance_tb(max_pos_bas, max_pos_top)
 
-        # Conversion de la distance euclidienne en mètres
-        distance_right_left = calculate_pixel_distance_lr(max_pos_right, max_pos_left)
+        # Profil horizontal
+            # Calcul de la distance euclidienne en pixels entre max_pos_right et max_pos_left et la convertir en mètres
+            def calculate_pixel_distance_lr(pos1lr, pos2lr, pixel_size_lr=5):
 
-    # Moyenne diamètre
-        # Trouver le plus petit et le plus grand diamètre
-        smallest_diameter = min(distance_right_left, distance_bas_top)
-        largest_diameter = max(distance_right_left, distance_bas_top)
+                # Calculer la distance euclidienne en pixels
+                pixel_distance_lr = np.sqrt((pos2lr[0] - pos1lr[0]) ** 2 + (pos2lr[1] - pos1lr[1]) ** 2)
 
-    # Moyennes des deux diamètres
-        moy_diam = np.mean([distance_right_left, distance_bas_top])
+                # Conversion de la distance euclidienne en mètres
+                distance_in_meters_lr = pixel_distance_lr * pixel_size_lr
+                return distance_in_meters_lr
 
-    # Calculer la circularité
-        circularity = round(smallest_diameter / largest_diameter, 2)
+            # Conversion de la distance euclidienne en mètres
+            distance_right_left = calculate_pixel_distance_lr(max_pos_right, max_pos_left)
 
-    # Calcul du rayon de la moyenne des diamètres
-        ray_largest_diam = round(moy_diam / 2, 1)
+        # Calcul du perimetre et de l'aire du polygone
 
-# PENTE
-    # Profil Horizontal
-        # Trouver la plus basse altitude et la plus haute altitude entre celle de l'Est et celle de l'Ouest
-        petite_altitude = min(max_val_right, max_val_left)
-        grande_altitude = max(max_val_right, max_val_left)
+            perimeter = 0
+            area = 0
 
-        # Calculer la différence d'altitude
-        altitude_difference = round(grande_altitude - petite_altitude, 4)
+            for i in range(len(max_coord_relative) - 1) :
 
-        # Calculer la pente en radians avec NumPy
-        slope_radians = round(np.arctan(altitude_difference / distance_right_left), 4)
+                # Calcul de distance pour le perimetre et la formule de Heron
+                da = calcul_distance(max_coord_relative[i], max_coord_relative[i+1])
+                db = calcul_distance(min_pos, max_coord_relative[i])
+                dc = calcul_distance(min_pos, max_coord_relative[i+1])
 
-        # Convertir la pente en degrés
-        slope_degrees_eo = round(np.degrees(slope_radians), 4)
+                # Formule de Heron
+                p= (da + db + dc)/2
 
-    # Profil Vertical
-        # Trouver la plus basse altitude et la plus haute altitude entre celle du Nord et celle du Sud
-        petite_altitude_ns = min(max_val_top, max_val_bas)
-        grande_altitude_ns = max(max_val_top, max_val_bas)
+                S = np.sqrt(p*(p-da)*(p-db)*(p-dc))
 
-        # Calculer la différence d'altitude
-        altitude_difference_ns = round(grande_altitude_ns - petite_altitude_ns, 4)
+                # Perimetre
+                perimeter +=da
 
-        # Calculer la pente en radians avec NumPy
-        slope_radians_ns = round(np.arctan(altitude_difference_ns / distance_bas_top), 4)
+                # Aire
+                area += S
 
-        # Convertir la pente en degrés
-        slope_degrees_ns = round(np.degrees(slope_radians_ns), 4)
+            perimeter = round(perimeter,2)
+            area = round(area, 2)
 
-    # Pente max entre les deux profils du cratère
-        pente_max = round(max(slope_degrees_ns, slope_degrees_eo), 1)
+        # Calcul de l'indice de circularité de Miller
+            circularity = (4 * np.pi * area) / perimeter**2
+            circularity = round(circularity,2)
+            print(circularity)
 
-    # Créer un cercle qui est ajusté au dimension du cratère
-        def buffer_diam_max(center_x, center_y, radius, num_points=40):
-            center = Point(center_x, center_y)
-            buffer_poly = center.buffer(radius, resolution=num_points)
-            return buffer_poly
 
-        buf_diam_max = buffer_diam_max(center_x_dl, center_y_dl, ray_largest_diam)
+        # Calcul du rayon de la moyenne des diamètres
+            ray_largest_diam = round(moy_diam / 2, 1)
 
-    # # DISTANCE MIN_VAL AVEC CHACUN DES POINTS HAUTS E,O,N,S
-    #     def pixel_distance_centre_haut(pos1ch, pos2ch, pixel_size_ch=2):
-    #
-    #         # Calculer la distance euclidienne en pixels
-    #         pixel_distance_ch = np.sqrt((pos2ch[0] - pos1ch[0]) ** 2 + (pos2ch[1] - pos1ch[1]) ** 2)
-    #
-    #         # Conversion de la distance euclidienne en mètres
-    #         distance_in_meters_ch = pixel_distance_ch * pixel_size_ch
-    #         return distance_in_meters_ch
-    #
-    #     # Conversion de la distance euclidienne en mètres
-    #     distance_centre_haut = pixel_distance_centre_haut(lowest_points[0], highest_points[0])
-    #     print(f"Distance entre le point haut au Nord et le point bas au centre : {distance_centre_haut} mètres", id)
 
-    # Moyenne des 4 altitudes du cratère
-# PROFONDEUR MOYENNE DU CRATERE
-        moyenne_altitude = round(np.mean([max_val_right, max_val_left, max_val_top, max_val_bas]), 4)
+    # PENTE
+        # Profil Horizontal
+            # Trouver la plus basse altitude et la plus haute altitude entre celle de l'Est et celle de l'Ouest
+            petite_altitude = min(max_val_right, max_val_left)
+            grande_altitude = max(max_val_right, max_val_left)
 
-        prof_moyen_crat = round(moyenne_altitude - min_val, 3)
+            # Calculer la différence d'altitude
+            altitude_difference = round(grande_altitude - petite_altitude, 4)
 
-# RATIO d/D - calcul du ratio d/D
-        ratio_dD = round(prof_moyen_crat / moy_diam, 3)
+            # Calculer la pente en radians avec NumPy
+            slope_radians = round(np.arctan(altitude_difference / distance_right_left), 4)
 
-# Ajouter les informations de Pente à la liste results_pente
-#         results_pente.append({'run_ID': id,
-#                               'Altitude_PHN': round(max_val_top, 3),
-#                               'Altitude_PHE': round(max_val_right, 3),
-#                               'Altitude_PHS': round(max_val_bas, 3),
-#                               'Altitude_PHO': round(max_val_left, 3),
-#                               'GPS_PHN_x': max_x_top,
-#                               'GPS_PHN_y': max_y_top,
-#                               'GPS_PHE_x': max_x_rg,
-#                               'GPS_PHE_y': max_y_rg,
-#                               'GPS_PHS_x': max_x_bas,
-#                               'GPS_PHS_y': max_y_bas,
-#                               'GPS_PHO_x': max_x_lf,
-#                               'GPS_PHO_y': max_y_lf,
-#                               'SCR': src.crs.to_string(),
-#                               'Hauteur_PHS_PHN': round(altitude_difference_ns, 3),
-#                               'degres_pente_PHS_PHN': round(slope_degrees_ns, 2),
-#                               'Hauteur_PHE_PHO': round(altitude_difference, 3),
-#                               'degres_pente_PHE_PHO': round(slope_degrees_eo, 2)
-#                                })
+            # Convertir la pente en degrés
+            slope_degrees_eo = round(np.degrees(slope_radians), 4)
 
-    # Ajouter les informations de Circularité à la liste results_circularite
-    #     results_circularite.append({'run_ID': id,
-    #                                 'Diametre_PHS_PHN': distance_bas_top,
-    #                                 'Diametre_PHE_PHO': distance_right_left,
-    #                                 'Moyenne_diametre': moy_diam,
-    #                                 'Circularite': round(circularity, 2)
-    #                                 })
+        # Profil Vertical
+            # Trouver la plus basse altitude et la plus haute altitude entre celle du Nord et celle du Sud
+            petite_altitude_ns = min(max_val_top, max_val_bas)
+            grande_altitude_ns = max(max_val_top, max_val_bas)
 
-        #Teste si le pixel haut Est, Ouest, Nord et Sud ne se trouve pas trop prêt de la limite du fichier de forme de polygone "selection_crateres.shp"
-        if (range_derniere_val_col == False and range_prem_val_col == False and range_prem_val_line == False and range_dern_val_line == False):
-            if (max_val_bas != min_val and max_val_top != min_val and max_val_right != min_val and max_val_left != min_val):
+            # Calculer la différence d'altitude
+            altitude_difference_ns = round(grande_altitude_ns - petite_altitude_ns, 4)
+
+            # Calculer la pente en radians avec NumPy
+            slope_radians_ns = round(np.arctan(altitude_difference_ns / distance_bas_top), 4)
+
+            # Convertir la pente en degrés
+            slope_degrees_ns = round(np.degrees(slope_radians_ns), 4)
+
+        # Pente max entre les deux profils du cratère
+            pente_max = round(max(slope_degrees_ns, slope_degrees_eo), 1)
+
+        # Créer un cercle qui est ajusté au dimension du cratère
+            def buffer_diam_max(center_x, center_y, radius, num_points=40):
+                center = Point(center_x, center_y)
+                buffer_poly = center.buffer(radius, resolution=num_points)
+                return buffer_poly
+
+            buf_diam_max = buffer_diam_max(center_x_dl, center_y_dl, ray_largest_diam)
+
+        # # DISTANCE MIN_VAL AVEC CHACUN DES POINTS HAUTS E,O,N,S
+        #     def pixel_distance_centre_haut(pos1ch, pos2ch, pixel_size_ch=2):
+        #
+        #         # Calculer la distance euclidienne en pixels
+        #         pixel_distance_ch = np.sqrt((pos2ch[0] - pos1ch[0]) ** 2 + (pos2ch[1] - pos1ch[1]) ** 2)
+        #
+        #         # Conversion de la distance euclidienne en mètres
+        #         distance_in_meters_ch = pixel_distance_ch * pixel_size_ch
+        #         return distance_in_meters_ch
+        #
+        #     # Conversion de la distance euclidienne en mètres
+        #     distance_centre_haut = pixel_distance_centre_haut(lowest_points[0], highest_points[0])
+        #     print(f"Distance entre le point haut au Nord et le point bas au centre : {distance_centre_haut} mètres", id)
+
+        # Moyenne des 4 altitudes du cratère
+    # PROFONDEUR MOYENNE DU CRATERE
+            moyenne_altitude = round(np.mean([max_val_right, max_val_left, max_val_top, max_val_bas]), 4)
+
+            prof_moyen_crat = round(moyenne_altitude - min_val, 3)
+
+    # RATIO d/D - calcul du ratio d/D
+            ratio_dD = round(prof_moyen_crat / moy_diam, 3)
+
+    # Ajouter les informations de Pente à la liste results_pente
+    #         results_pente.append({'run_ID': id,
+    #                               'Altitude_PHN': round(max_val_top, 3),
+    #                               'Altitude_PHE': round(max_val_right, 3),
+    #                               'Altitude_PHS': round(max_val_bas, 3),
+    #                               'Altitude_PHO': round(max_val_left, 3),
+    #                               'GPS_PHN_x': max_x_top,
+    #                               'GPS_PHN_y': max_y_top,
+    #                               'GPS_PHE_x': max_x_rg,
+    #                               'GPS_PHE_y': max_y_rg,
+    #                               'GPS_PHS_x': max_x_bas,
+    #                               'GPS_PHS_y': max_y_bas,
+    #                               'GPS_PHO_x': max_x_lf,
+    #                               'GPS_PHO_y': max_y_lf,
+    #                               'SCR': src.crs.to_string(),
+    #                               'Hauteur_PHS_PHN': round(altitude_difference_ns, 3),
+    #                               'degres_pente_PHS_PHN': round(slope_degrees_ns, 2),
+    #                               'Hauteur_PHE_PHO': round(altitude_difference, 3),
+    #                               'degres_pente_PHE_PHO': round(slope_degrees_eo, 2)
+    #                                })
+
+        # Ajouter les informations de Circularité à la liste results_circularite
+        #     results_circularite.append({'run_ID': id,
+        #                                 'Diametre_PHS_PHN': distance_bas_top,
+        #                                 'Diametre_PHE_PHO': distance_right_left,
+        #                                 'Moyenne_diametre': moy_diam,
+        #                                 'Circularite': round(circularity, 2)
+        #                                 })
+
+            #Teste si le pixel haut Est, Ouest, Nord et Sud ne se trouve pas trop prêt de la limite du fichier de forme de polygone "selection_crateres.shp"
+
+            angle = 0
             # Rempli le tableau results_ratio_dD si tous les critères de sélection sont respectés
-                if (moy_diam >= 40 and circularity >= 0.9 and circularity <= 1 and pente_max <= 8):
-                    result_geom_select_crat.append({'run_id': id,
-                                                    'nac_dtm_id': nac_id,
-                                                    'geometry': buf_diam_max,
-                                                    'center_lon': center_x_dl,
-                                                    'center_lat': center_y_dl,
-                                                    'ray_maxdia': ray_largest_diam,
-                                                    'moyen_diam': round(moy_diam, 0),
-                                                    'prof_moyen': prof_moyen_crat,
-                                                    'ratio_dD': ratio_dD,
-                                                    'circularit': circularity,
-                                                    'pente_rim': pente_max,
-                                                    'swirl': ""})
-                    highest_points.append({ 'geometry': point_haut_vert_360,    'max_alt': round(max_val_top, 1),     'position': "point haut",   'run_id': id, 'NAC_DTM_ID': nac_id})
-                    highest_points.append({ 'geometry': point_haut_vert_180,    'max_alt': round(max_val_bas, 1),     'position': "point bas",    'run_id': id, 'NAC_DTM_ID': nac_id})
-                    highest_points.append({ 'geometry': point_haut_horiz_270,   'max_alt': round(max_val_left, 1),    'position': "point gauche", 'run_id': id, 'NAC_DTM_ID': nac_id})
-                    highest_points.append({ 'geometry': point_haut_horiz_90,    'max_alt': round(max_val_right, 1),   'position': "point droite", 'run_id': id, 'NAC_DTM_ID': nac_id})
-                    # lowest_point_origine.append({   'geometry': point_bas_origine,      'min_altitude': round(min_val, 1),                                'run_id': id, 'NAC_DTM_ID': nac_id})
+            if (moy_diam >= 40 and circularity >= 0.5 and circularity <= 1 and pente_max <= 8):
+
+                for line in ligne_geom:
+                    angle +=10
+                    Lignes_visualisation.append(({'geometry': line,'position': str(angle), 'run_id': id, 'NAC_DTM_ID': nac_id}))
+
+                for limit_point in limit :
+                    angle += 10
+                    limit_points.append(({'geometry': limit_point,'position': str(angle), 'run_id': id, 'NAC_DTM_ID': nac_id}))
+
+
+                result_geom_select_crat.append({'run_id': id,
+                                                'nac_dtm_id': nac_id,
+                                                'geometry': buf_diam_max,
+                                                'center_lon': center_x_dl,
+                                                'center_lat': center_y_dl,
+                                                'ray_maxdia': ray_largest_diam,
+                                                'moyen_diam': round(moy_diam, 0),
+                                                'prof_moyen': prof_moyen_crat,
+                                                'ratio_dD': ratio_dD,
+                                                'circularit': circularity,
+                                                'pente_rim': pente_max,
+                                                'swirl': ""})
+
+                # Créer un objet Point
+
+                lowest_points.append({'geometry': min_geom, 'alt': round(min_val, 1),
+                                      'position': "point-bas", 'run_id': id, 'NAC_DTM_ID': nac_id})
+
+                for i in range(len(max_geom)) :
+
+                    highest_points.append({'geometry': max_geom[i], 'max_alt': round(max_value[i], 1),
+                                           'position': "point " + str(angle), 'run_id': id, 'NAC_DTM_ID': nac_id})
+
+                    angle += 10
+
+                profil_90.append({ 'geometry': point_haut_vert_360,    'max_alt': round(max_val_top, 1),     'position': "point haut",   'run_id': id, 'NAC_DTM_ID': nac_id})
+                profil_90.append({ 'geometry': point_haut_vert_180,    'max_alt': round(max_val_bas, 1),     'position': "point bas",    'run_id': id, 'NAC_DTM_ID': nac_id})
+                profil_90.append({ 'geometry': point_haut_horiz_270,   'max_alt': round(max_val_left, 1),    'position': "point gauche", 'run_id': id, 'NAC_DTM_ID': nac_id})
+                profil_90.append({ 'geometry': point_haut_horiz_90,    'max_alt': round(max_val_right, 1),   'position': "point droite", 'run_id': id, 'NAC_DTM_ID': nac_id})
+                # lowest_point_origine.append({   'geometry': point_bas_origine,      'min_altitude': round(min_val, 1),                                'run_id': id, 'NAC_DTM_ID': nac_id})
 
 # Création des fichiers finaux
 
@@ -406,16 +494,28 @@ shapefile_path = 'results/RG2/results_geom_08_40m_RG8_v2.shp'
 gdf.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points bas
-# gdf = gpd.GeoDataFrame(lowest_point_origine, crs=craters.crs)
+gdf_haut_rg = gpd.GeoDataFrame(lowest_points, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-# shapefile_path = 'C:/Users/calg2564/PycharmProjects/pythonProject/RG_5-6-7-8/deepL_RG_5-6-7-8/donnes_sorties/RG8/results_bas_RG_8.shp'
-# gdf.to_file(shapefile_path)
+shapefile_path = 'results/RG2/results_geom_bas_RG2.shp'
+gdf_haut_rg.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points hauts
 gdf_haut_rg = gpd.GeoDataFrame(highest_points, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
 shapefile_path = 'results/RG2/results_geom_08_40m_RG8_v2.shp'
 gdf_haut_rg.to_file(shapefile_path)
+
+# Créer un GeoDataFrame avec les coordonnées GPS des points hauts tous les 90*
+gdf_haut_rg = gpd.GeoDataFrame(profil_90, crs=craters.crs)
+# Enregistrer le GeoDataFrame au format Shapefile
+shapefile_path = 'results/RG2/results_geom_90_RG2.shp'
+gdf_haut_rg.to_file(shapefile_path)
+
+# Créer un GeoDataFrame avec les coordonnées GPS des points limit
+gdf_limit = gpd.GeoDataFrame(limit_points, crs=craters.crs)
+# Enregistrer le GeoDataFrame au format Shapefile
+shapefile_path = 'results/RG2/results_geom_limit_RG2.shp'
+gdf_limit.to_file(shapefile_path)
 
 # Pente en CSV
 # Convertir la liste results_pente en DataFrame pandas
@@ -428,3 +528,8 @@ gdf_haut_rg.to_file(shapefile_path)
 # df_circu = pd.DataFrame(results_circularite)
 # Sauvegarder le DataFrame dans un fichier CSV
 # df_circu.to_csv('C:/Users/calg2564/PycharmProjects/pythonProject/rg2-3-4_MNT5m/results_circularite_rg2.csv', index=False)
+
+gdf = gpd.GeoDataFrame(Lignes_visualisation, crs=craters.crs)
+shapefile_path = 'results/RG2/test_lignes.shp'
+gdf.to_file(shapefile_path)
+
