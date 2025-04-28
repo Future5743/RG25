@@ -121,7 +121,7 @@ with rasterio.open(raster_path) as src:
                     masked_image[0, x1, y1]
                     break
                 except :
-                    D = D*0.95
+                    D = D*0.99
                     x1 = int(x0 + D * np.cos(angle_rad))
                     y1 = int(y0 + D * np.sin(angle_rad))
 
