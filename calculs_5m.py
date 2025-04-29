@@ -1,8 +1,10 @@
 # 11/04/2025. Code en cours de mise à jour.
 
-# Import de la bibliothèque python "Geopandas". Permet de manipuler des données géographiques.
-import geopandas as gpd
-import shapely
+######################################################################################################################################################################################
+#################################################################################### IMPORTATIONS ####################################################################################
+######################################################################################################################################################################################
+
+import geopandas as gpd                # Import de la bibliothèque python "Geopandas". Permet de manipuler des données géographiques.
 
 import skimage as sk
 
@@ -16,7 +18,9 @@ from shapely.geometry import Point, LineString, Polygon
 
 from tqdm import tqdm
 
-
+######################################################################################################################################################################################
+#################################################################################### DATA OPENING ####################################################################################
+######################################################################################################################################################################################
 
 # Stocke le chemin d'accès du fichier shapefile "Buffer (large) des cratères" dans une variable.
 crater_shapefile_path = 'data/Buffer_crateres/Buffer_RG2/'
@@ -33,24 +37,26 @@ swirls = gpd.read_file(swirls_path)
 
 swirls_geom = swirls['geometry']
 
-# Initialisation d'une liste pour stocker la geometry 'point' avec son information d'altitude.
-highest_points = []
+######################################################################################################################################################################################
+#################################################################################### LIST CREATION ###################################################################################
+######################################################################################################################################################################################
 
-lowest_points = []
+# POINT geometry
+highest_points = []             # Stocke la géométrie des points les plus hauts correspondants à la crête du cratère
 
-profil_90 = []
+lowest_points = []              # Stocke la géométrie des points le plus bas
 
-limit_points = []
+profil_90 = []                  # Stocke la géométrie des points les plus hauts de la crête tous les 90°
 
-centers = []
+centers = []                    # Stocke la géométrie des centres de chaque cratères valide trouvé par YOLOv5
 
-# Initialisation d'une liste pour stocker la geometry 'LinString'.
+# LINESTRING geometry
 
-Lignes_visualisation = []
+Lignes_visualisation = []       # Stocke la géométrie des lignes pour visualiser chaques profils
 
-# Initialisation d'une liste pour stocker la geometry 'Polygon'.
+# POLYGON geometry
 
-rim_approx = []
+rim_approx = []                 # Stocke la géométrie issue du polygone formé par les highest_points
 
 # Liste pour stocker les informations nécessaires concernant la pente entre les bords opposés d'un cratère
 results_pente = []
@@ -66,6 +72,10 @@ results_ratio_dD = []
 
 # Force l'affichage complet d'un tableau numpy
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
+
+######################################################################################################################################################################################
+######################################################################################## CODE ########################################################################################
+######################################################################################################################################################################################
 
 # Ouverture du fichier raster.
 with rasterio.open(raster_path) as src:
@@ -101,7 +111,7 @@ with rasterio.open(raster_path) as src:
         gdf_centre_crater = gdf_centre_crater.to_crs(swirls.crs)
 
         swirl_on_or_off = 'off-swirl'
-        
+
         for poly in swirls_geom.tolist():
             if poly.contains(gdf_centre_crater['geometry'].iloc[0]):
                 swirl_on_or_off = 'on-swirl'
@@ -113,52 +123,58 @@ with rasterio.open(raster_path) as src:
             min_val = round(masked_image.min(), 4)
             min_pos = np.unravel_index(masked_image.argmin(), masked_image.shape)
 
-        D = masked_image.shape[1] * 2 ### D =  Diamietre du buffer
+        D = masked_image.shape[1] * 2
 
 
-# ELEVATION HAUTE
-        max_value = []
-        max_coord_relative = []
-        max_coord_real = []
-        max_geom = []
-        limit = []
-        ligne_geom = []
+    ### ELEVATION HAUTE
 
+        # Initialisation de listes pour stocker les données futures
+        max_value = []              # Stocke les valeurs des altitudes des highest_points
+        max_coord_relative = []     # Stocke les coordonnées relatives des highest_points
+        max_coord_real = []         # Stocke les coordonnées réelles des highest_points
+        max_geom = []               # Stocke les géométries des highest_points
+        line_geom = []              # Stocke les géométries des lignes des profils étudiés
+
+        # Initialisation de l'angle étudié pour former les profils
         angle = 0
 
+        # Attribition de variables pour les coordonnées relatives du lowest point
         x0, y0 = min_pos[1], min_pos[2]
-        for i in range(36) :
 
-            # print("#####", angle, "#####")
+        # Boucle pour étudier des profils tous les 10°
+        for i in range(36):
 
+            # Convertion de l'angle en radian
             angle_rad = np.deg2rad(angle)
 
-            x0, y0 = min_pos[1], min_pos[2]
-
+            # Coordonnées des points à l'extremité du profil
             x1 = int(x0 + D * np.cos(angle_rad))
             y1 = int(y0 + D * np.sin(angle_rad))
 
-            while True :
-                try :
+            # Ajustement du profil à masked_image
+            while True:
+                try:
                     masked_image[0, x1, y1]
                     break
-                except :
-                    D = D*0.99
+                except:
+                    D = D*0.99          # Réduction de la longueur du profil de 1%
                     x1 = int(x0 + D * np.cos(angle_rad))
                     y1 = int(y0 + D * np.sin(angle_rad))
 
-            # print(masked_image[0,x1,y1])
-
+            # Définition de la ligne du profil étudié
             rr, cc = sk.draw.line(x0, y0, x1, y1)
+            line_value = masked_image[0, rr, cc]        # Extraction des altitudes de la ligne
 
+            # Ajout de 10° à l'angle
             angle += 10
 
-            line_value = masked_image[0, rr, cc]
+            # On exclue les cratères dont les lignes de profils contiennent moins de 3 pixels
+            if line_value.shape[0] > 3:
 
-            if line_value.shape[0] > 3 :
-
+                # Extraction de l'altitude maximale
                 maximum = np.max(line_value)
 
+                # Recalcul du maximum si celui-ci correspond à un des trois derniers pixels de la ligne de profil
                 while maximum == line_value[-1] or maximum == line_value[-2] or maximum == line_value[-3]:
 
                     index = np.where(line_value == maximum)
@@ -167,7 +183,8 @@ with rasterio.open(raster_path) as src:
 
                     maximum = np.max(line_value)
 
-                if maximum != min_val :
+                # Exclusion des cratères où l'altitude maximale d'un profil est égale à l'altitude minimale (peut correspondre à une erreur de détection de YOLOv5)
+                if maximum != min_val:
                     max_value.append(maximum)
 
                     index_max = np.where(masked_image[0, rr, cc] == maximum)
@@ -180,27 +197,21 @@ with rasterio.open(raster_path) as src:
 
                     max_coord_real.append(max_real_coordinates)
 
+                    lowest_point_coord = rasterio.transform.xy(out_transform, rr[0], cc[0])
+                    limit_point_coord = rasterio.transform.xy(out_transform, rr[-1], cc[-1])
+
+                    # Ajout des géométries dans leur liste correspondantes
                     max_geom.append(Point(max_real_coordinates[0], max_real_coordinates[1]))
+                    min_geom = Point(lowest_point_coord[0], lowest_point_coord[1])
+                    line_geom.append(LineString([lowest_point_coord, limit_point_coord]))
 
-                    ligne_coord1 = rasterio.transform.xy(out_transform, rr[0], cc[0])
-                    ligne_coord2 = rasterio.transform.xy(out_transform, rr[-1], cc[-1])
+        if len(max_geom) == 36:
 
-                    min_geom = Point(ligne_coord1[0], ligne_coord1[1])
-                    ligne_geom.append(LineString([ligne_coord1, ligne_coord2]))
-
-                    limit.append(Point(ligne_coord2[0], ligne_coord2[1]))
-
-        if len(max_geom) == 36 :
-            # print(max_value)
-            # print(max_coord_relative)
-            # print(max_geom)
-            # print(ligne_geom)
-            # print(max_coord_real)
-
+            # Ajout de la géométrie issue des highest_points
             rim_approx_geom = Polygon(max_coord_real)
 
 
-    # ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
+    ### ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
 
         # Pour la ligne de pixels extraite, trouver les valeurs des colonnes à droite de la position minimale dans la même ligne
             # Index de la ligne où se trouve l'altitude la plus basse
@@ -304,7 +315,7 @@ with rasterio.open(raster_path) as src:
             D = []
 
             # Calcul des differents valeurs de diametres
-            def calcul_distance(pos1, pos2, pixel_size_tb = 5) :
+            def calcul_distance(pos1, pos2, pixel_size_tb=5):
 
                 pixel_dist_tb = np.sqrt((pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2)
 
@@ -322,7 +333,7 @@ with rasterio.open(raster_path) as src:
             # Calcul du rayon de la moyenne des diamètres
             ray_largest_diam = round(moy_diam / 2, 1)
 
-            if calcul_distance(ligne_coord1, coord_center) < moy_diam * 0.25 and moy_diam>=40 :
+            if calcul_distance(lowest_point_coord, coord_center) < moy_diam * 0.25 and moy_diam >= 40:
 
                 '''
             # Profil vertical
@@ -452,7 +463,7 @@ with rasterio.open(raster_path) as src:
                             buffer_poly = center.buffer(radius, resolution=num_points)
                             return buffer_poly
 
-                        buf_diam_max = buffer_diam_max(ligne_coord1[0], ligne_coord1[1], ray_largest_diam)
+                        buf_diam_max = buffer_diam_max(lowest_point_coord[0], lowest_point_coord[1], ray_largest_diam)
 
                     # # DISTANCE MIN_VAL AVEC CHACUN DES POINTS HAUTS E,O,N,S
                     #     def pixel_distance_centre_haut(pos1ch, pos2ch, pixel_size_ch=2):
@@ -512,12 +523,8 @@ with rasterio.open(raster_path) as src:
                         angle = 0
                         # Rempli le tableau results_ratio_dD si tous les critères de sélection sont respectés
 
-                        for line in ligne_geom:
+                        for line in line_geom:
                             Lignes_visualisation.append(({'geometry': line,'position': str(angle), 'run_id': id, 'NAC_DTM_ID': nac_id}))
-                            angle += 10
-
-                        for limit_point in limit :
-                            limit_points.append(({'geometry': limit_point,'position': str(angle), 'run_id': id, 'NAC_DTM_ID': nac_id}))
                             angle += 10
 
                         centers.append(({'geometry': coord_center_geom,'position': "centre", 'run_id': id, 'NAC_DTM_ID': nac_id}))
@@ -540,7 +547,7 @@ with rasterio.open(raster_path) as src:
                         # Créer un objet Point
 
                         lowest_points.append({'geometry': min_geom, 'alt': round(min_val, 1),
-                                              'position': ligne_coord1, 'run_id': id, 'NAC_DTM_ID': nac_id})
+                                              'position': lowest_point_coord, 'run_id': id, 'NAC_DTM_ID': nac_id})
 
                         for i in range(len(max_geom)):
 
@@ -553,6 +560,11 @@ with rasterio.open(raster_path) as src:
                         profil_90.append({ 'geometry': point_haut_vert_180,    'max_alt': round(max_val_bas, 1),     'position': "point bas",    'run_id': id, 'NAC_DTM_ID': nac_id})
                         profil_90.append({ 'geometry': point_haut_horiz_270,   'max_alt': round(max_val_left, 1),    'position': "point gauche", 'run_id': id, 'NAC_DTM_ID': nac_id})
                         profil_90.append({ 'geometry': point_haut_horiz_90,    'max_alt': round(max_val_right, 1),   'position': "point droite", 'run_id': id, 'NAC_DTM_ID': nac_id})
+
+
+######################################################################################################################################################################################
+#################################################################################### RESULTS DATA ####################################################################################
+######################################################################################################################################################################################
 
 # Création des fichiers finaux
 
@@ -579,12 +591,6 @@ gdf_max_90 = gpd.GeoDataFrame(profil_90, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
 shapefile_path = 'results/RG2/results_geom_90_RG2.shp'
 gdf_max_90.to_file(shapefile_path)
-
-# Créer un GeoDataFrame avec les coordonnées GPS des points limit
-gdf_limit = gpd.GeoDataFrame(limit_points, crs=craters.crs)
-# Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/RG2/results_geom_limit_RG2.shp'
-gdf_limit.to_file(shapefile_path)
 
 # Pente en CSV
 # Convertir la liste results_pente en DataFrame pandas
