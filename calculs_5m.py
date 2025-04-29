@@ -2,6 +2,7 @@
 
 # Import de la bibliothèque python "Geopandas". Permet de manipuler des données géographiques.
 import geopandas as gpd
+import shapely
 
 import skimage as sk
 
@@ -26,13 +27,13 @@ craters = gpd.read_file(crater_shapefile_path)
 raster_path = "../data/DTM/NAC_DTM_REINER.tiff"
 
 # Stocke le chemin d'acces du fichier shapefile "LUNAR_SWIRLS_180" dans une variable
-swirls_path = "data/Swirl/LUNAR_SWIRLS_180.SHP"
+swirls_path = "data/Swirl/REINER_GAMMA.shp"
 # Lecture de la variable précédente à l'aide de Géopandas. Devient un GeoDataFrame (permet la visualisation et la manipulation du fichier)
 swirls = gpd.read_file(swirls_path)
 
 swirls_geom = swirls['geometry']
 
-# Initialisation d'une liste pour stocker la geometry 'point' avec son information d'altitude. Direction depuis l'origine : verticale 360°
+# Initialisation d'une liste pour stocker la geometry 'point' avec son information d'altitude.
 highest_points = []
 
 lowest_points = []
@@ -41,9 +42,13 @@ profil_90 = []
 
 limit_points = []
 
+centers = []
+
+# Initialisation d'une liste pour stocker la geometry 'LinString'.
+
 Lignes_visualisation = []
 
-centers = []
+# Initialisation d'une liste pour stocker la geometry 'Polygon'.
 
 rim_approx = []
 
@@ -58,9 +63,6 @@ result_geom_select_crat = []
 
 # Liste pour stocker les informations nécessaires concernant le calcul final du ratio dD de chaque cratères
 results_ratio_dD = []
-
-# Liste pour stocker l'information 'on-swirl' ou 'off-swirl'
-swirl = []
 
 # Force l'affichage complet d'un tableau numpy
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
@@ -92,6 +94,19 @@ with rasterio.open(raster_path) as src:
 
         coord_center_geom = Point(coord_center)
 
+# ON-SWIRLS or OFF-SWIRLS
+
+        gdf_centre_crater = gpd.GeoDataFrame([({'geometry': coord_center_geom})], crs=craters.crs)
+
+        gdf_centre_crater = gdf_centre_crater.to_crs(swirls.crs)
+
+        swirl_on_or_off = 'off-swirl'
+        
+        for poly in swirls_geom.tolist():
+            if poly.contains(gdf_centre_crater['geometry'].iloc[0]):
+                swirl_on_or_off = 'on-swirl'
+
+
 # ELEVATION BASSE : A l'interieur du cercle, trouver l'élévation la plus basse et sa position
 
         if masked_image.count() > 0:
@@ -110,7 +125,6 @@ with rasterio.open(raster_path) as src:
         ligne_geom = []
 
         angle = 0
-
 
         x0, y0 = min_pos[1], min_pos[2]
         for i in range(36) :
@@ -493,6 +507,8 @@ with rasterio.open(raster_path) as src:
 
                         #Teste si le pixel haut Est, Ouest, Nord et Sud ne se trouve pas trop prêt de la limite du fichier de forme de polygone "selection_crateres.shp"
 
+                        print(swirl_on_or_off)
+
                         angle = 0
                         # Rempli le tableau results_ratio_dD si tous les critères de sélection sont respectés
 
@@ -519,7 +535,7 @@ with rasterio.open(raster_path) as src:
                                                         'ratio_dD': ratio_dD,
                                                         'circularit': circularity,
                                                         'pente_rim': max_slope,
-                                                        'swirl': ""})
+                                                        'swirl': swirl_on_or_off})
 
                         # Créer un objet Point
 
@@ -553,16 +569,16 @@ shapefile_path = 'results/RG2/results_geom_bas_RG2.shp'
 gdf_haut_rg.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points hauts
-gdf_haut_rg = gpd.GeoDataFrame(highest_points, crs=craters.crs)
+gdf_max = gpd.GeoDataFrame(highest_points, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
 shapefile_path = 'results/RG2/results_geom_max_RG2.shp'
-gdf_haut_rg.to_file(shapefile_path)
+gdf_max.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points hauts tous les 90*
-gdf_haut_rg = gpd.GeoDataFrame(profil_90, crs=craters.crs)
+gdf_max_90 = gpd.GeoDataFrame(profil_90, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
 shapefile_path = 'results/RG2/results_geom_90_RG2.shp'
-gdf_haut_rg.to_file(shapefile_path)
+gdf_max_90.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points limit
 gdf_limit = gpd.GeoDataFrame(limit_points, crs=craters.crs)
@@ -582,17 +598,17 @@ gdf_limit.to_file(shapefile_path)
 # Sauvegarder le DataFrame dans un fichier CSV
 # df_circu.to_csv('C:/Users/calg2564/PycharmProjects/pythonProject/rg2-3-4_MNT5m/results_circularite_rg2.csv', index=False)
 
-gdf = gpd.GeoDataFrame(Lignes_visualisation, crs=craters.crs)
+gdf_line = gpd.GeoDataFrame(Lignes_visualisation, crs=craters.crs)
 shapefile_path = 'results/RG2/test_lignes.shp'
-gdf.to_file(shapefile_path)
+gdf_line.to_file(shapefile_path)
 
-gdf_limit = gpd.GeoDataFrame(centers, crs=craters.crs)
+gdf_centers = gpd.GeoDataFrame(centers, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
 shapefile_path = 'results/RG2/results_geom_centers_RG2.shp'
-gdf_limit.to_file(shapefile_path)
+gdf_centers.to_file(shapefile_path)
 
-gdf_limit = gpd.GeoDataFrame(rim_approx, crs=craters.crs)
+gdf_rim = gpd.GeoDataFrame(rim_approx, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
 shapefile_path = 'results/RG2/results_geom_rim_RG2.shp'
-gdf_limit.to_file(shapefile_path)
+gdf_rim.to_file(shapefile_path)
 
