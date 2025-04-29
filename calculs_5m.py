@@ -25,6 +25,13 @@ craters = gpd.read_file(crater_shapefile_path)
 # Stocke le chemin d'accès du fichier raster "Modèle Numérique de Terrain" dans une variable.
 raster_path = "../data/DTM/NAC_DTM_REINER.tiff"
 
+# Stocke le chemin d'acces du fichier shapefile "LUNAR_SWIRLS_180" dans une variable
+swirls_path = "data/Swirl/LUNAR_SWIRLS_180.SHP"
+# Lecture de la variable précédente à l'aide de Géopandas. Devient un GeoDataFrame (permet la visualisation et la manipulation du fichier)
+swirls = gpd.read_file(swirls_path)
+
+swirls_geom = swirls['geometry']
+
 # Initialisation d'une liste pour stocker la geometry 'point' avec son information d'altitude. Direction depuis l'origine : verticale 360°
 highest_points = []
 
@@ -37,6 +44,8 @@ limit_points = []
 Lignes_visualisation = []
 
 centers = []
+
+rim_approx = []
 
 # Liste pour stocker les informations nécessaires concernant la pente entre les bords opposés d'un cratère
 results_pente = []
@@ -95,6 +104,7 @@ with rasterio.open(raster_path) as src:
 # ELEVATION HAUTE
         max_value = []
         max_coord_relative = []
+        max_coord_real = []
         max_geom = []
         limit = []
         ligne_geom = []
@@ -154,6 +164,8 @@ with rasterio.open(raster_path) as src:
 
                     max_real_coordinates = rasterio.transform.xy(out_transform, max_coordinates[0], max_coordinates[1])
 
+                    max_coord_real.append(max_real_coordinates)
+
                     max_geom.append(Point(max_real_coordinates[0], max_real_coordinates[1]))
 
                     ligne_coord1 = rasterio.transform.xy(out_transform, rr[0], cc[0])
@@ -169,6 +181,9 @@ with rasterio.open(raster_path) as src:
             # print(max_coord_relative)
             # print(max_geom)
             # print(ligne_geom)
+            # print(max_coord_real)
+
+            rim_approx_geom = Polygon(max_coord_real)
 
 
     # ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
@@ -381,7 +396,6 @@ with rasterio.open(raster_path) as src:
                         slopes.append(slope_deg)
 
                     max_slope = np.max(slopes)
-                    print(max_slope)
 
                     if max_slope < 8 :
 
@@ -424,7 +438,7 @@ with rasterio.open(raster_path) as src:
                             buffer_poly = center.buffer(radius, resolution=num_points)
                             return buffer_poly
 
-                        buf_diam_max = buffer_diam_max(center_x_dl, center_y_dl, ray_largest_diam)
+                        buf_diam_max = buffer_diam_max(ligne_coord1[0], ligne_coord1[1], ray_largest_diam)
 
                     # # DISTANCE MIN_VAL AVEC CHACUN DES POINTS HAUTS E,O,N,S
                     #     def pixel_distance_centre_haut(pos1ch, pos2ch, pixel_size_ch=2):
@@ -447,8 +461,6 @@ with rasterio.open(raster_path) as src:
 
                 # RATIO d/D - calcul du ratio d/D
                         ratio_dD = round(prof_moyen_crat / moy_diam, 3)
-
-                        print(ratio_dD)
 
                 # Ajouter les informations de Pente à la liste results_pente
                 #         results_pente.append({'run_ID': id,
@@ -494,6 +506,8 @@ with rasterio.open(raster_path) as src:
 
                         centers.append(({'geometry': coord_center_geom,'position': "centre", 'run_id': id, 'NAC_DTM_ID': nac_id}))
 
+                        rim_approx.append(({'geometry': rim_approx_geom,'run_id': id, 'NAC_DTM_ID': nac_id}))
+
                         result_geom_select_crat.append({'run_id': id,
                                                         'nac_dtm_id': nac_id,
                                                         'geometry': buf_diam_max,
@@ -510,7 +524,7 @@ with rasterio.open(raster_path) as src:
                         # Créer un objet Point
 
                         lowest_points.append({'geometry': min_geom, 'alt': round(min_val, 1),
-                                              'position': "point-bas", 'run_id': id, 'NAC_DTM_ID': nac_id})
+                                              'position': ligne_coord1, 'run_id': id, 'NAC_DTM_ID': nac_id})
 
                         for i in range(len(max_geom)):
 
@@ -575,5 +589,10 @@ gdf.to_file(shapefile_path)
 gdf_limit = gpd.GeoDataFrame(centers, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
 shapefile_path = 'results/RG2/results_geom_centers_RG2.shp'
+gdf_limit.to_file(shapefile_path)
+
+gdf_limit = gpd.GeoDataFrame(rim_approx, crs=craters.crs)
+# Enregistrer le GeoDataFrame au format Shapefile
+shapefile_path = 'results/RG2/results_geom_rim_RG2.shp'
 gdf_limit.to_file(shapefile_path)
 
