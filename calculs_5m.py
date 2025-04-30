@@ -30,7 +30,7 @@ from tqdm import tqdm
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
-zone = 'RG2'
+zone = 'RG7'
 
 # Stocke le chemin d'accès du fichier shapefile "Buffer (large) des cratères" dans une variable
 crater_shapefile_path = 'data/Buffer_crateres/Buffer_' + zone +'/'
@@ -336,7 +336,7 @@ with rasterio.open(raster_path) as src:
                     # Créer un objet Point
                     point_haut_vert_180 = Point(max_x_bas, max_y_bas)
 
-        # DIAMETRES
+        ### DIAMETRES
                 D = []
 
                 # Calcul des differents valeurs de diametres
@@ -422,7 +422,7 @@ with rasterio.open(raster_path) as src:
 
                     if (0.9<= circularity <=1) :
 
-                # PENTE
+        ### PENTE
 
                         slopes = []
                         for i in range (int(len(max_value)/2)) :
@@ -482,7 +482,7 @@ with rasterio.open(raster_path) as src:
                             pente_max = round(max(slope_degrees_ns, slope_degrees_eo), 1)
                             '''
 
-                        # Créer un cercle qui est ajusté au dimension du cratère
+        ### CREATION D'UN CERCLE AJUSTE AUX DIMENSIONS DU CRATERE
                             def buffer_diam_max(center_x, center_y, radius, num_points=40):
                                 center = Point(center_x, center_y)
                                 buffer_poly = center.buffer(radius, resolution=num_points)
@@ -543,10 +543,10 @@ with rasterio.open(raster_path) as src:
 
                             #Teste si le pixel haut Est, Ouest, Nord et Sud ne se trouve pas trop prêt de la limite du fichier de forme de polygone "selection_crateres.shp"
 
-    ### Ajout de la géométrie issue des highest_points
+        ### Ajout de la géométrie issue des highest_points
                             rim_approx_geom = Polygon(max_coord_real)
 
-    ### Lissage du polygone issu du polygone précédent
+        ### Lissage du polygone issu du polygone précédent
 
                             '''
                             def bezier_curve(p0, p1, p2, n=20) :
@@ -580,10 +580,13 @@ with rasterio.open(raster_path) as src:
 
                             rim_approx_smooth_geom = smooth_polygon_with_bezier(rim_approx_geom)
                             '''
-    ### CREATION DES PROFILS TOPOGRAPHIQUES
+
+        ### CREATION DES PROFILS TOPOGRAPHIQUES
 
                             all_profiles = []
-                            min_X = [0] * 100
+                            min_X = [0] * 1000          # Trouver une variable plus exacte aue 1000
+
+            ### Creation des 18 profils du cratere
                             for i in range(int(len(profils) / 2)):
 
                                 demi_profil = profils[i + 18]
@@ -591,7 +594,7 @@ with rasterio.open(raster_path) as src:
                                 reversed_demi_profil = list(reversed(profils[i]))[:-1]
 
                                 demi_x_positif = list(range(len(demi_profil)))
-                                demi_x_negatif = list(reversed([(valeur + 1 )* -1 for valeur in list(range(len(reversed_demi_profil)))]))
+                                demi_x_negatif = list(reversed([(valeur + 1 ) * -1 for valeur in list(range(len(reversed_demi_profil)))]))
 
                                 X = demi_x_negatif + demi_x_positif
 
@@ -619,8 +622,7 @@ with rasterio.open(raster_path) as src:
                                 plt.savefig("results/" + zone + "/profils/" + str(id) +"/Profil_" + str(i * 10) +"_" + str((i + 18) * 10) +".png")
                                 plt.close()
 
-
-
+            ### Adaptation des profils pour le moyennage futur
                             for profil_individuel in all_profiles:
                                 if len(profil_individuel) > len(min_X):
                                     excedant = len(profil_individuel) - len(min_X)
@@ -635,6 +637,7 @@ with rasterio.open(raster_path) as src:
                                         else :
                                             profil_individuel = profil_individuel[int(excedant / 2): - math.ceil(excedant / 2)]
 
+            ### Moyennage des profils
                             profil_moyen = []
                             for x in range(len(min_X)) :
                                 colonne_i = [sous_liste[x] for sous_liste in all_profiles]
@@ -650,16 +653,16 @@ with rasterio.open(raster_path) as src:
 
 
 
-    ### MISE EN PLACE DES DATAS POUR LA CREATION FUTURE DES SHAPEFILE
+        ### MISE EN PLACE DES DATAS POUR LA CREATION FUTURE DES SHAPEFILE
                             angle = 0
 
                             for line in line_geom:
-                                Lignes_visualisation.append(({'geometry': line,'position': str(angle), 'run_id': id, 'NAC_DTM_ID': nac_id}))
+                                Lignes_visualisation.append(({'geometry': line, 'position': str(angle), 'run_id': id, 'NAC_DTM_ID': nac_id}))
                                 angle += 10
 
-                            centers.append(({'geometry': coord_center_geom,'position': "centre", 'run_id': id, 'NAC_DTM_ID': nac_id}))
+                            centers.append(({'geometry': coord_center_geom, 'position': "centre", 'run_id': id, 'NAC_DTM_ID': nac_id}))
 
-                            rim_approx.append(({'geometry': rim_approx_geom,'run_id': id, 'NAC_DTM_ID': nac_id}))
+                            rim_approx.append(({'geometry': rim_approx_geom, 'run_id': id, 'NAC_DTM_ID': nac_id}))
 
                             # rim_approx_smooth.append(({'geometry': rim_approx_smooth_geom, 'run_id': id, 'NAC_DTM_ID': nac_id}))
 
