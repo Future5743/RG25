@@ -16,14 +16,18 @@ import numpy as np
 
 from shapely.geometry import Point, LineString, Polygon
 
+from shapely.geometry.polygon import orient
+
 from tqdm import tqdm
 
 ######################################################################################################################################################################################
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
+zone = 'RG2'
+
 # Stocke le chemin d'accès du fichier shapefile "Buffer (large) des cratères" dans une variable
-crater_shapefile_path = 'data/Buffer_crateres/Buffer_RG2/'
+crater_shapefile_path = 'data/Buffer_crateres/Buffer_' + zone +'/'
 
 # Stocke le chemin d'accès du fichier raster "Modèle Numérique de Terrain" dans une variable
 raster_path = "../data/DTM/NAC_DTM_REINER.tiff"
@@ -63,6 +67,8 @@ Lignes_visualisation = []       # Stocke la géométrie des lignes pour visualis
 # POLYGON geometry
 
 rim_approx = []                 # Stocke la géométrie issue du polygone formé par les highest_points
+
+rim_approx_smooth = []          # Stocke la géométrie lissée issue du polygone formé par les highest_points
 
 # Liste pour stocker les informations nécessaires concernant la pente entre les bords opposés d'un cratère
 results_pente = []
@@ -220,10 +226,6 @@ with rasterio.open(raster_path) as src:
                         line_geom.append(LineString([lowest_point_coord, limit_point_coord]))
 
             if len(max_geom) == 36:
-
-                # Ajout de la géométrie issue des highest_points
-                rim_approx_geom = Polygon(max_coord_real)
-
 
         ### ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
 
@@ -532,6 +534,43 @@ with rasterio.open(raster_path) as src:
 
                             #Teste si le pixel haut Est, Ouest, Nord et Sud ne se trouve pas trop prêt de la limite du fichier de forme de polygone "selection_crateres.shp"
 
+    ### Ajout de la géométrie issue des highest_points
+                            rim_approx_geom = Polygon(max_coord_real)
+
+    ### Lissage du polygone issu du polygone précédent
+
+                            '''
+                            def bezier_curve(p0, p1, p2, n=20) :
+                                t = np.linspace(0,1,n)
+
+                                return (1-t)[:, None]**2 * p0 + 2 * (1-t)[:, None] * t[:, None] * p1 + t[:, None]**2 * p2
+
+                            def smooth_polygon_with_bezier (poly: Polygon, n=20) :
+                                if not poly.is_valid:
+                                    raise ValueError("Polygone non valide")
+                                coords = list(poly.exterior.coords)
+
+                                if coords[0] != coords[-1]:
+                                    coords.append(coords[0])
+
+                                smoothed_points = []
+
+                                for i in range(len(coords) - 2):
+                                    p0 = np.array(coords[i])
+                                    p1 = np.array(coords[i+1])
+                                    p2 = np.array(coords[i+2])
+
+                                    curve = bezier_curve(p0, p1, p2, n)
+                                    smoothed_points.extend(curve[:-1]) #Pour éviter les doublons
+
+                                smoothed_points.append(smoothed_points[0])
+
+                                smooth_poly = Polygon(smoothed_points)
+
+                                return orient(smooth_poly)
+
+                            rim_approx_smooth_geom = smooth_polygon_with_bezier(rim_approx_geom)
+                            '''
                             angle = 0
                             # Rempli le tableau results_ratio_dD si tous les critères de sélection sont respectés
 
@@ -542,6 +581,8 @@ with rasterio.open(raster_path) as src:
                             centers.append(({'geometry': coord_center_geom,'position': "centre", 'run_id': id, 'NAC_DTM_ID': nac_id}))
 
                             rim_approx.append(({'geometry': rim_approx_geom,'run_id': id, 'NAC_DTM_ID': nac_id}))
+
+                            # rim_approx_smooth.append(({'geometry': rim_approx_smooth_geom, 'run_id': id, 'NAC_DTM_ID': nac_id}))
 
                             result_geom_select_crat.append({'run_id': id,
                                                             'nac_dtm_id': nac_id,
@@ -584,25 +625,25 @@ with rasterio.open(raster_path) as src:
 # Créer un GeoDataFrame avec les coordonnées GPS des cercles répondant à l'ensemble des critères de sélection des cratères pour l'étude du ratio d/D
 gdf = gpd.GeoDataFrame(result_geom_select_crat, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/RG2/results_geom_08_40m_RG8_v2.shp'
+shapefile_path = 'results/' + zone + '/results_geom_08_40m_' + zone + '_v2.shp'
 gdf.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points bas
 gdf_haut_rg = gpd.GeoDataFrame(lowest_points, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/RG2/results_geom_bas_RG2.shp'
+shapefile_path = 'results/' + zone + '/results_geom_bas_' + zone + '.shp'
 gdf_haut_rg.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points hauts
 gdf_max = gpd.GeoDataFrame(highest_points, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/RG2/results_geom_max_RG2.shp'
+shapefile_path = 'results/' + zone + '/results_geom_max_' + zone + '.shp'
 gdf_max.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points hauts tous les 90*
 gdf_max_90 = gpd.GeoDataFrame(profil_90, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/RG2/results_geom_90_RG2.shp'
+shapefile_path = 'results/' + zone + '/results_geom_90_' + zone + '.shp'
 gdf_max_90.to_file(shapefile_path)
 
 # Pente en CSV
@@ -618,15 +659,22 @@ gdf_max_90.to_file(shapefile_path)
 # df_circu.to_csv('C:/Users/calg2564/PycharmProjects/pythonProject/rg2-3-4_MNT5m/results_circularite_rg2.csv', index=False)
 
 gdf_line = gpd.GeoDataFrame(Lignes_visualisation, crs=craters.crs)
-shapefile_path = 'results/RG2/test_lignes.shp'
+shapefile_path = 'results/' + zone + '/results_geom_line_' + zone + '.shp'
 gdf_line.to_file(shapefile_path)
 
 gdf_centers = gpd.GeoDataFrame(centers, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/RG2/results_geom_centers_RG2.shp'
+shapefile_path = 'results/' + zone + '/results_geom_centers_' + zone + '.shp'
 gdf_centers.to_file(shapefile_path)
 
 gdf_rim = gpd.GeoDataFrame(rim_approx, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/RG2/results_geom_rim_RG2.shp'
+shapefile_path = 'results/' + zone + '/results_geom_rim_' + zone + '.shp'
 gdf_rim.to_file(shapefile_path)
+
+'''
+gdf_rim_smoothed = gpd.GeoDataFrame(rim_approx_smooth, crs=craters.crs)
+# Enregistrer le GeoDataFrame au format Shapefile
+shapefile_path = 'results/' + zone + '/results_geom_rim_smoothed_' + zone + '.shp'
+gdf_rim_smoothed.to_file(shapefile_path)
+'''
