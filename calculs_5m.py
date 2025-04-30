@@ -8,6 +8,10 @@ import geopandas as gpd                # Import de la bibliothèque python "Geop
 
 import skimage as sk
 
+import matplotlib.pyplot as plt
+
+import os
+
 import rasterio
 
 from rasterio.mask import mask
@@ -154,6 +158,7 @@ with rasterio.open(raster_path) as src:
             max_coord_real = []         # Stocke les coordonnées réelles des highest_points
             max_geom = []               # Stocke les géométries des highest_points
             line_geom = []              # Stocke les géométries des lignes des profils étudiés
+            profils = []                # Stocke les profls topographiques
 
             # Initialisation de l'angle étudié pour former les profils
             angle = 0
@@ -184,6 +189,8 @@ with rasterio.open(raster_path) as src:
                 # Définition de la ligne du profil étudié
                 rr, cc = sk.draw.line(x0, y0, x1, y1)
                 line_value = masked_image[0, rr, cc]        # Extraction des altitudes de la ligne
+
+                profils.append(list(line_value))            # On ajoute chaque demi-profil à la liste profils
 
                 # Ajout de 10° à l'angle
                 angle += 10
@@ -571,6 +578,45 @@ with rasterio.open(raster_path) as src:
 
                             rim_approx_smooth_geom = smooth_polygon_with_bezier(rim_approx_geom)
                             '''
+
+                            print(np.mean(profils))
+                            for i in range(int(len(profils) / 2)):
+
+                                if profils[i][0] == min_val:
+                                    demi_profil = profils[i + 18]
+                                    reversed_demi_profil = list(reversed(profils[i]))[:-1]
+
+                                else:
+                                    demi_profil = profils[i]
+                                    reversed_demi_profil = list(reversed(profils[i + 18]))[:-1]
+
+                                demi_x_positif = list(range(len(demi_profil)))
+                                demi_x_negatif = list(reversed([(valeur + 1 )* -1 for valeur in list(range(len(reversed_demi_profil)))]))
+
+                                X = demi_x_negatif + demi_x_positif
+
+                                profil = reversed_demi_profil + demi_profil
+
+                                '''
+                                if D[i]>100:
+                                    plt.figure(figsize= (int(D[i]) / 25, int(prof_moyen_crat / 2.5)))
+
+                                else:
+                                    plt.figure(figsize= (int(D[i]), int(prof_moyen_crat * 5)))
+                                '''
+
+                                plt.plot(X, profil, marker='x')
+                                plt.xlabel("Position du pixel par rapport au point le plus bas")
+                                plt.ylabel("Altitude")
+                                plt.title("Profil topographique pour les angles " + str(i * 10) + " et " + str((i + 18) * 10))
+                                plt.grid(True)
+
+                                if not os.path.exists("results/" + zone + "/profils/" + str(id)):
+                                    os.makedirs("results/" + zone + "/profils/" + str(id))
+
+                                plt.savefig("results/" + zone + "/profils/" + str(id) +"/Profil_" + str(i * 10) +"_" + str((i + 18) * 10) +".png")
+                                plt.close()
+
                             angle = 0
                             # Rempli le tableau results_ratio_dD si tous les critères de sélection sont respectés
 
