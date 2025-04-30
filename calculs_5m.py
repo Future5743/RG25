@@ -30,13 +30,13 @@ from tqdm import tqdm
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
-zone = 'RG7'
+zone = '2'
 
 # Stocke le chemin d'accès du fichier shapefile "Buffer (large) des cratères" dans une variable
-crater_shapefile_path = 'data/Buffer_crateres/Buffer_' + zone +'/'
+crater_shapefile_path = 'data/Buffer_crateres/Buffer_RG' + zone + '/'
 
 # Stocke le chemin d'accès du fichier raster "Modèle Numérique de Terrain" dans une variable
-raster_path = "../data/DTM/NAC_DTM_REINER.tiff"
+raster_path = "../data/DTM/NAC_DTM_REINER" + zone + ".tiff"
 
 # Stocke le chemin d'accès du fichier shapefile HIESINGER2011_MARE_AGE_UNITS_180 dans une variable
 hiesinger_path = "data/HIESINGER2011_MARE_AGE_UNITS_180/HIESINGER2011_MARE_AGE_UNITS_180.SHP"
@@ -122,7 +122,7 @@ with rasterio.open(raster_path) as src:
 
         coord_center_geom = Point(coord_center)
 
-# HIESINGER
+### HIESINGER
         gdf_centre_crater = gpd.GeoDataFrame([({'geometry': coord_center_geom})], crs=craters.crs)
 
         gdf_centre_crater = gdf_centre_crater.to_crs(hiesinger.crs)
@@ -135,7 +135,7 @@ with rasterio.open(raster_path) as src:
                     floor_age = hiesinger_age[i]
                     break
 
-    # ON-SWIRLS or OFF-SWIRLS
+    ### ON-SWIRLS or OFF-SWIRLS
             gdf_centre_crater = gdf_centre_crater.to_crs(swirls.crs)
 
             swirl_on_or_off = 'off-swirl'
@@ -190,6 +190,7 @@ with rasterio.open(raster_path) as src:
 
                 # Définition de la ligne du profil étudié
                 rr, cc = sk.draw.line(x0, y0, x1, y1)
+
                 line_value = masked_image[0, rr, cc]        # Extraction des altitudes de la ligne
 
                 profils.append(list(line_value))            # On ajoute chaque demi-profil à la liste profils
@@ -340,7 +341,7 @@ with rasterio.open(raster_path) as src:
                 D = []
 
                 # Calcul des differents valeurs de diametres
-                def calcul_distance(pos1, pos2, pixel_size_tb=5):
+                def calcul_distance(pos1, pos2, pixel_size_tb=2):
 
                     pixel_dist_tb = np.sqrt((pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2)
 
@@ -420,7 +421,7 @@ with rasterio.open(raster_path) as src:
                     circularity = (4 * np.pi * area) / perimeter**2
                     circularity = round(circularity,2)
 
-                    if (0.9<= circularity <=1) :
+                    if (0.95<= circularity <=1) :
 
         ### PENTE
 
@@ -447,7 +448,7 @@ with rasterio.open(raster_path) as src:
 
                         max_slope = np.max(slopes)
 
-                        if max_slope < 8 :
+                        if max_slope < 8:
 
                             '''
                         # Profil Horizontal
@@ -616,10 +617,10 @@ with rasterio.open(raster_path) as src:
                                 plt.grid(True)
 
                                 # Gestion des dossiers
-                                if not os.path.exists("results/" + zone + "/profils/" + str(id)):
-                                    os.makedirs("results/" + zone + "/profils/" + str(id))
+                                if not os.path.exists("results/RG" + zone + "/profils/" + str(id)):
+                                    os.makedirs("results/RG" + zone + "/profils/" + str(id))
 
-                                plt.savefig("results/" + zone + "/profils/" + str(id) +"/Profil_" + str(i * 10) +"_" + str((i + 18) * 10) +".png")
+                                plt.savefig("results/RG" + zone + "/profils/" + str(id) +"/Profil_" + str(i * 10) +"_" + str((i + 18) * 10) +".png")
                                 plt.close()
 
             ### Adaptation des profils pour le moyennage futur
@@ -648,7 +649,7 @@ with rasterio.open(raster_path) as src:
                             plt.ylabel("Altitude")
                             plt.title("Moyenne des profils topographiques")
                             plt.grid(True)
-                            plt.savefig("results/" + zone + "/profils/" + str(id) + "/Profil_moyen.png")
+                            plt.savefig("results/RG" + zone + "/profils/" + str(id) + "/Profil_moyen.png")
                             plt.close()
 
 
@@ -657,10 +658,12 @@ with rasterio.open(raster_path) as src:
                             angle = 0
 
                             for line in line_geom:
-                                Lignes_visualisation.append(({'geometry': line, 'position': str(angle), 'run_id': id, 'NAC_DTM_ID': nac_id}))
+                                Lignes_visualisation.append(({'geometry': line, 'position': str(angle),
+                                                              'run_id': id, 'NAC_DTM_ID': nac_id}))
                                 angle += 10
 
-                            centers.append(({'geometry': coord_center_geom, 'position': "centre", 'run_id': id, 'NAC_DTM_ID': nac_id}))
+                            centers.append(({'geometry': coord_center_geom, 'position': "centre",
+                                             'run_id': id, 'NAC_DTM_ID': nac_id}))
 
                             rim_approx.append(({'geometry': rim_approx_geom, 'run_id': id, 'NAC_DTM_ID': nac_id}))
 
@@ -692,10 +695,14 @@ with rasterio.open(raster_path) as src:
 
                                 angle += 10
 
-                            profil_90.append({ 'geometry': point_haut_vert_360,    'max_alt': round(max_val_top, 1),     'position': "point haut",   'run_id': id, 'NAC_DTM_ID': nac_id})
-                            profil_90.append({ 'geometry': point_haut_vert_180,    'max_alt': round(max_val_bas, 1),     'position': "point bas",    'run_id': id, 'NAC_DTM_ID': nac_id})
-                            profil_90.append({ 'geometry': point_haut_horiz_270,   'max_alt': round(max_val_left, 1),    'position': "point gauche", 'run_id': id, 'NAC_DTM_ID': nac_id})
-                            profil_90.append({ 'geometry': point_haut_horiz_90,    'max_alt': round(max_val_right, 1),   'position': "point droite", 'run_id': id, 'NAC_DTM_ID': nac_id})
+                            profil_90.append({ 'geometry': point_haut_vert_360,    'max_alt': round(max_val_top, 1),
+                                               'position': "point haut",   'run_id': id, 'NAC_DTM_ID': nac_id})
+                            profil_90.append({ 'geometry': point_haut_vert_180,    'max_alt': round(max_val_bas, 1),
+                                               'position': "point bas",    'run_id': id, 'NAC_DTM_ID': nac_id})
+                            profil_90.append({ 'geometry': point_haut_horiz_270,   'max_alt': round(max_val_left, 1),
+                                               'position': "point gauche", 'run_id': id, 'NAC_DTM_ID': nac_id})
+                            profil_90.append({ 'geometry': point_haut_horiz_90,    'max_alt': round(max_val_right, 1),
+                                               'position': "point droite", 'run_id': id, 'NAC_DTM_ID': nac_id})
 
 
 ######################################################################################################################################################################################
@@ -707,25 +714,25 @@ with rasterio.open(raster_path) as src:
 # Créer un GeoDataFrame avec les coordonnées GPS des cercles répondant à l'ensemble des critères de sélection des cratères pour l'étude du ratio d/D
 gdf = gpd.GeoDataFrame(result_geom_select_crat, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/' + zone + '/results_geom_08_40m_' + zone + '_v2.shp'
+shapefile_path = 'results/RG' + zone + '/results_geom_08_40m_RG' + zone + '_v2.shp'
 gdf.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points bas
 gdf_haut_rg = gpd.GeoDataFrame(lowest_points, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/' + zone + '/results_geom_bas_' + zone + '.shp'
+shapefile_path = 'results/RG' + zone + '/results_geom_bas_RG' + zone + '.shp'
 gdf_haut_rg.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points hauts
 gdf_max = gpd.GeoDataFrame(highest_points, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/' + zone + '/results_geom_max_' + zone + '.shp'
+shapefile_path = 'results/RG' + zone + '/results_geom_max_RG' + zone + '.shp'
 gdf_max.to_file(shapefile_path)
 
 # Créer un GeoDataFrame avec les coordonnées GPS des points hauts tous les 90*
 gdf_max_90 = gpd.GeoDataFrame(profil_90, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/' + zone + '/results_geom_90_' + zone + '.shp'
+shapefile_path = 'results/RG' + zone + '/results_geom_90_RG' + zone + '.shp'
 gdf_max_90.to_file(shapefile_path)
 
 # Pente en CSV
@@ -741,22 +748,22 @@ gdf_max_90.to_file(shapefile_path)
 # df_circu.to_csv('C:/Users/calg2564/PycharmProjects/pythonProject/rg2-3-4_MNT5m/results_circularite_rg2.csv', index=False)
 
 gdf_line = gpd.GeoDataFrame(Lignes_visualisation, crs=craters.crs)
-shapefile_path = 'results/' + zone + '/results_geom_line_' + zone + '.shp'
+shapefile_path = 'results/RG' + zone + '/results_geom_line_RG' + zone + '.shp'
 gdf_line.to_file(shapefile_path)
 
 gdf_centers = gpd.GeoDataFrame(centers, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/' + zone + '/results_geom_centers_' + zone + '.shp'
+shapefile_path = 'results/RG' + zone + '/results_geom_centers_RG' + zone + '.shp'
 gdf_centers.to_file(shapefile_path)
 
 gdf_rim = gpd.GeoDataFrame(rim_approx, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/' + zone + '/results_geom_rim_' + zone + '.shp'
+shapefile_path = 'results/RG' + zone + '/results_geom_rim_RG' + zone + '.shp'
 gdf_rim.to_file(shapefile_path)
 
 '''
 gdf_rim_smoothed = gpd.GeoDataFrame(rim_approx_smooth, crs=craters.crs)
 # Enregistrer le GeoDataFrame au format Shapefile
-shapefile_path = 'results/' + zone + '/results_geom_rim_smoothed_' + zone + '.shp'
+shapefile_path = 'results/RG' + zone + '/results_geom_rim_smoothed_RG' + zone + '.shp'
 gdf_rim_smoothed.to_file(shapefile_path)
 '''
