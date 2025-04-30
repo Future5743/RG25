@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 
 import os
 
+import math
+
 import rasterio
 
 from rasterio.mask import mask
@@ -578,47 +580,78 @@ with rasterio.open(raster_path) as src:
 
                             rim_approx_smooth_geom = smooth_polygon_with_bezier(rim_approx_geom)
                             '''
+    ### CREATION DES PROFILS TOPOGRAPHIQUES
 
-                            print(np.mean(profils))
+                            all_profiles = []
+                            min_X = [0] * 100
                             for i in range(int(len(profils) / 2)):
 
-                                if profils[i][0] == min_val:
-                                    demi_profil = profils[i + 18]
-                                    reversed_demi_profil = list(reversed(profils[i]))[:-1]
+                                demi_profil = profils[i + 18]
 
-                                else:
-                                    demi_profil = profils[i]
-                                    reversed_demi_profil = list(reversed(profils[i + 18]))[:-1]
+                                reversed_demi_profil = list(reversed(profils[i]))[:-1]
 
                                 demi_x_positif = list(range(len(demi_profil)))
                                 demi_x_negatif = list(reversed([(valeur + 1 )* -1 for valeur in list(range(len(reversed_demi_profil)))]))
 
                                 X = demi_x_negatif + demi_x_positif
 
+                                if len(X) < len(min_X):
+                                    min_X = X
+
+                                # Gestion du profil
                                 profil = reversed_demi_profil + demi_profil
 
-                                '''
-                                if D[i]>100:
-                                    plt.figure(figsize= (int(D[i]) / 25, int(prof_moyen_crat / 2.5)))
+                                profil = [x if isinstance(x, np.float32) else np.nan for x in profil]
 
-                                else:
-                                    plt.figure(figsize= (int(D[i]), int(prof_moyen_crat * 5)))
-                                '''
+                                all_profiles.append(profil)
 
+                                # Création de la figure
                                 plt.plot(X, profil, marker='x')
                                 plt.xlabel("Position du pixel par rapport au point le plus bas")
                                 plt.ylabel("Altitude")
                                 plt.title("Profil topographique pour les angles " + str(i * 10) + " et " + str((i + 18) * 10))
                                 plt.grid(True)
 
+                                # Gestion des dossiers
                                 if not os.path.exists("results/" + zone + "/profils/" + str(id)):
                                     os.makedirs("results/" + zone + "/profils/" + str(id))
 
                                 plt.savefig("results/" + zone + "/profils/" + str(id) +"/Profil_" + str(i * 10) +"_" + str((i + 18) * 10) +".png")
                                 plt.close()
 
+
+
+                            for profil_individuel in all_profiles:
+                                if len(profil_individuel) > len(min_X):
+                                    excedant = len(profil_individuel) - len(min_X)
+
+                                    if excedant % 2 == 0:
+                                        profil_individuel = profil_individuel[int(excedant/2) : - int(excedant/2)]
+                                    else:
+                                        index = np.where(profil_individuel == min_val)
+
+                                        if len(profil_individuel)/2 < index[0]:
+                                            profil_individuel = profil_individuel[math.ceil(excedant/2) : - int(excedant/2)]
+                                        else :
+                                            profil_individuel = profil_individuel[int(excedant / 2): - math.ceil(excedant / 2)]
+
+                            profil_moyen = []
+                            for x in range(len(min_X)) :
+                                colonne_i = [sous_liste[x] for sous_liste in all_profiles]
+                                profil_moyen.append(np.mean(colonne_i))
+
+                            plt.plot(min_X, profil_moyen, marker='x')
+                            plt.xlabel("Position du pixel par rapport au point le plus bas")
+                            plt.ylabel("Altitude")
+                            plt.title("Moyenne des profils topographiques")
+                            plt.grid(True)
+                            plt.savefig("results/" + zone + "/profils/" + str(id) + "/Profil_moyen.png")
+                            plt.close()
+
+
+
+    ### MISE EN PLACE DES DATAS POUR LA CREATION FUTURE DES SHAPEFILE
                             angle = 0
-                            # Rempli le tableau results_ratio_dD si tous les critères de sélection sont respectés
 
                             for line in line_geom:
                                 Lignes_visualisation.append(({'geometry': line,'position': str(angle), 'run_id': id, 'NAC_DTM_ID': nac_id}))
