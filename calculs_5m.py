@@ -4,7 +4,7 @@
 #################################################################################### IMPORTATIONS ####################################################################################
 ######################################################################################################################################################################################
 
-import geopandas as gpd                # Import de la bibliothèque python "Geopandas". Permet de manipuler des données géographiques.
+import geopandas as gpd    # Import de la bibliothèque python "Geopandas". Permet de manipuler des données géographiques
 
 import skimage as sk
 
@@ -34,6 +34,11 @@ from tqdm import tqdm
 
 zone = '2'
 
+if zone in ['1,2,3,4']:
+    pixel_size_tb = 2
+else :
+    pixel_size_tb = 5
+
 # Stocke le chemin d'accès du fichier shapefile "Buffer (large) des cratères" dans une variable
 crater_shapefile_path = 'data/Buffer_crateres/Buffer_RG' + zone + '/'
 
@@ -46,7 +51,8 @@ hiesinger_path = "data/HIESINGER2011_MARE_AGE_UNITS_180/HIESINGER2011_MARE_AGE_U
 # Stocke le chemin d'acces du fichier shapefile "LUNAR_SWIRLS_180" dans une variable
 swirls_path = "data/Swirl/REINER_GAMMA.shp"
 
-# Lecture des variables à l'aide de Géopandas. Devient un GeoDataFrame (permet la visualisation et la manipulation du fichier)
+# Lecture des variables à l'aide de Géopandas.
+# Devient un GeoDataFrame (permet la visualisation et la manipulation du fichier)
 craters = gpd.read_file(crater_shapefile_path)
 hiesinger = gpd.read_file(hiesinger_path)
 swirls = gpd.read_file(swirls_path)
@@ -81,7 +87,8 @@ rim_approx_smooth = []          # Stocke la géométrie lissée issue du polygon
 # Liste pour stocker les informations nécessaires concernant la pente entre les bords opposés d'un cratère
 results_pente = []
 
-# Liste pour stocker les informations nécessaires concernant la circularité d'un cratère et ce pour l'ensemble des cratères sélectionnés
+# Liste pour stocker les informations nécessaires concernant la circularité d'un cratère
+# et ce pour l'ensemble des cratères sélectionnés
 results_circularite = []
 
 # Géométrie des cratères finaux
@@ -96,11 +103,13 @@ np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 ######################################################################################################################################################################################
 ######################################################################################## CODE ########################################################################################
 ######################################################################################################################################################################################
+
 if os.path.exists("results/RG" + zone + "/profils"):
     try:
         shutil.rmtree("results/RG" + zone + "/profils")
     except OSError as e:
         print(f"Error:{e.strerror}")
+
 
 # Ouverture du fichier raster.
 with rasterio.open(raster_path) as src:
@@ -162,12 +171,13 @@ with rasterio.open(raster_path) as src:
         ### ELEVATION HAUTE
 
             # Initialisation de listes pour stocker les données futures
-            max_value = []              # Stocke les valeurs des altitudes des highest_points
-            max_coord_relative = []     # Stocke les coordonnées relatives des highest_points
-            max_coord_real = []         # Stocke les coordonnées réelles des highest_points
-            max_geom = []               # Stocke les géométries des highest_points
-            line_geom = []              # Stocke les géométries des lignes des profils étudiés
-            profils = []                # Stocke les profls topographiques
+            max_value = []                  # Stocke les valeurs des altitudes des highest_points
+            max_coord_relative = []         # Stocke les coordonnées relatives des highest_points
+            max_coord_real = []             # Stocke les coordonnées réelles des highest_points
+            max_geom = []                   # Stocke les géométries des highest_points
+            line_geom = []                  # Stocke les géométries des lignes des profils étudiés
+            profils = []                    # Stocke les profls topographiques
+            demi_profils_coords_relatives = []   # Stocke les coordonnées relatives des points présents dans le profil
 
             # Initialisation de l'angle étudié pour former les profils
             angle = 0
@@ -198,6 +208,8 @@ with rasterio.open(raster_path) as src:
                 # Définition de la ligne du profil étudié
                 rr, cc = sk.draw.line(x0, y0, x1, y1)
 
+                demi_profils_coords_relatives.append([rr,cc])
+
                 line_value = masked_image[0, rr, cc]        # Extraction des altitudes de la ligne
 
                 profils.append(list(line_value))            # On ajoute chaque demi-profil à la liste profils
@@ -220,7 +232,8 @@ with rasterio.open(raster_path) as src:
 
                         maximum = np.max(line_value)
 
-                    # Exclusion des cratères où l'altitude maximale d'un profil est égale à l'altitude minimale (peut correspondre à une erreur de détection de YOLOv5)
+                    # Exclusion des cratères où l'altitude maximale d'un profil est égale à l'altitude minimale
+                    # (peut correspondre à une erreur de détection de YOLOv5)
                     if maximum != min_val:
                         max_value.append(maximum)
 
@@ -230,7 +243,8 @@ with rasterio.open(raster_path) as src:
 
                         max_coord_relative.append(max_coordinates)
 
-                        max_real_coordinates = rasterio.transform.xy(out_transform, max_coordinates[0], max_coordinates[1])
+                        max_real_coordinates = rasterio.transform.xy(out_transform, max_coordinates[0],
+                                                                     max_coordinates[1])
 
                         max_coord_real.append(max_real_coordinates)
 
@@ -357,7 +371,7 @@ with rasterio.open(raster_path) as src:
                     return distance_in_meters_tb
 
                 for i in range(int(len(max_coord_relative)/2)) :
-                    D.append(calcul_distance(max_coord_relative[i], max_coord_relative[i+18]))
+                    D.append(calcul_distance(max_coord_relative[i], max_coord_relative[i+18], pixel_size_tb))
 
                 D = np.array(D)
 
@@ -366,7 +380,7 @@ with rasterio.open(raster_path) as src:
                 # Calcul du rayon de la moyenne des diamètres
                 ray_largest_diam = round(moy_diam / 2, 1)
 
-                if calcul_distance(lowest_point_coord, coord_center) < moy_diam * 0.25 and moy_diam >= 40:
+                if calcul_distance(lowest_point_coord, coord_center, pixel_size_tb) < moy_diam * 0.25 and moy_diam >= 40:
 
                     '''
                 # Profil vertical
@@ -406,29 +420,29 @@ with rasterio.open(raster_path) as src:
                     for i in range(len(max_coord_relative) - 1) :
 
                         # Calcul de distance pour le perimetre et la formule de Heron
-                        da = calcul_distance(max_coord_relative[i], max_coord_relative[i+1])
-                        db = calcul_distance(min_pos, max_coord_relative[i])
-                        dc = calcul_distance(min_pos, max_coord_relative[i+1])
+                        da = calcul_distance(max_coord_relative[i], max_coord_relative[i+1], pixel_size_tb)
+                        db = calcul_distance(min_pos, max_coord_relative[i], pixel_size_tb)
+                        dc = calcul_distance(min_pos, max_coord_relative[i+1], pixel_size_tb)
 
                         # Formule de Heron
-                        p= (da + db + dc)/2
+                        p = (da + db + dc)/2
 
-                        S = np.sqrt(p*(p-da)*(p-db)*(p-dc))
+                        S = np.sqrt(p * (p - da) * (p - db) * (p-dc))
 
                         # Perimetre
-                        perimeter +=da
+                        perimeter += da
 
                         # Aire
                         area += S
 
-                    perimeter = round(perimeter,2)
+                    perimeter = round(perimeter, 2)
                     area = round(area, 2)
 
                 # Calcul de l'indice de circularité de Miller
                     circularity = (4 * np.pi * area) / perimeter**2
-                    circularity = round(circularity,2)
+                    circularity = round(circularity, 2)
 
-                    if 0.97 <= circularity <= 1:
+                    if 0.99 <= circularity <= 1:
 
         ### PENTE
 
@@ -436,7 +450,7 @@ with rasterio.open(raster_path) as src:
                         for i in range(int(len(max_value)/2)):
 
                             # Calcul de la distance entre les points des crêtes opposées
-                            dist = calcul_distance(max_coord_relative[i], max_coord_relative[i+18])
+                            dist = calcul_distance(max_coord_relative[i], max_coord_relative[i+18], pixel_size_tb)
 
                             # Trouver la plus basse et la plus haute altitude pour les profils tous les 10 m
                             low_alt = min(max_value[i], max_value[i+18])
@@ -549,7 +563,8 @@ with rasterio.open(raster_path) as src:
                         #                                 'Circularite': round(circularity, 2)
                         #                                 })
 
-                            #Teste si le pixel haut Est, Ouest, Nord et Sud ne se trouve pas trop prêt de la limite du fichier de forme de polygone "selection_crateres.shp"
+                            # Teste si le pixel haut Est, Ouest, Nord et Sud ne se trouve pas trop prêt de la limite du
+                            # fichier de forme de polygone "selection_crateres.shp"
 
         ### Ajout de la géométrie issue des highest_points
                             rim_approx_geom = Polygon(max_coord_real)
@@ -597,16 +612,31 @@ with rasterio.open(raster_path) as src:
             ### Creation des 18 profils du cratere
                             for i in range(int(len(profils) / 2)):
 
+                                X = []
+
                                 demi_profil = profils[i + 18]
+
 
                                 reversed_demi_profil = list(reversed(profils[i]))[:-1]
 
                                 limit_profil = len(reversed_demi_profil)
 
-                                demi_x_positif = list(range(len(demi_profil)))
-                                demi_x_negatif = list(reversed([(valeur + 1 ) * -1 for valeur in list(range(len(reversed_demi_profil)))]))
+                                demi_profils_coords_relatives[i][0] = list(reversed(demi_profils_coords_relatives[i][0]))[:-1]
+                                demi_profils_coords_relatives[i][1] = list(reversed(demi_profils_coords_relatives[i][1]))[:-1]
 
-                                X = demi_x_negatif + demi_x_positif
+
+                                demi_profils_coords_relatives[i + 18][0] = list(demi_profils_coords_relatives[i + 18][0])
+                                demi_profils_coords_relatives[i + 18][1] = list(demi_profils_coords_relatives[i + 18][1])
+
+                                profils_coords_relatives_rr = demi_profils_coords_relatives[i][0] + demi_profils_coords_relatives[i + 18][0]
+                                profils_coords_relatives_cc = demi_profils_coords_relatives[i][1] + demi_profils_coords_relatives[i + 18][1]
+
+
+                                for pixel in range(len(profils_coords_relatives_rr)):
+                                    dist = calcul_distance([profils_coords_relatives_rr[0], profils_coords_relatives_cc[0]],
+                                                           [profils_coords_relatives_rr[pixel], profils_coords_relatives_cc[pixel]], pixel_size_tb)
+                                    X.append(dist)
+
 
                                 if len(X) < len(min_X):
                                     min_X = X
@@ -619,14 +649,15 @@ with rasterio.open(raster_path) as src:
                                 all_profiles.append(profil)
 
                                 # Création de la figure
+                                plt.figure(figsize=(40, 15))
                                 plt.plot(X, profil, marker='x')
-                                plt.xlabel("Position du pixel par rapport au point le plus bas")
+                                plt.xlabel("Distance (m)")
                                 plt.ylabel("Altitude")
                                 plt.title("Profil topographique pour les angles " + str(i * 10) + " et " + str((i + 18) * 10))
                                 plt.grid(True)
 
                                 # Gestion des dossiers
-                                if swirl_on_or_off == 'on_swirl' :
+                                if swirl_on_or_off == 'on-swirl' :
                                     path = "results/RG" + zone + "/profils/on_swirl/" + str(id)
                                     if not os.path.exists(path):
                                         os.makedirs(path)
@@ -658,15 +689,14 @@ with rasterio.open(raster_path) as src:
                                 colonne_i = [sous_liste[x] for sous_liste in all_profiles]
                                 profil_moyen.append(np.mean(colonne_i))
 
+                            plt.figure(figsize=(40,15))
                             plt.plot(min_X, profil_moyen, marker='x')
-                            plt.xlabel("Position du pixel par rapport au point le plus bas")
+                            plt.xlabel("Distance (m)")
                             plt.ylabel("Altitude")
                             plt.title("Moyenne des profils topographiques")
                             plt.grid(True)
                             plt.savefig(path + "/Profil_moyen.png")
                             plt.close()
-
-
 
         ### MISE EN PLACE DES DATAS POUR LA CREATION FUTURE DES SHAPEFILE
                             angle = 0
