@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 
 import os
 
+import shutil
+
 import math
 
 import rasterio
@@ -94,6 +96,11 @@ np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 ######################################################################################################################################################################################
 ######################################################################################## CODE ########################################################################################
 ######################################################################################################################################################################################
+if os.path.exists("results/RG" + zone + "/profils"):
+    try:
+        shutil.rmtree("results/RG" + zone + "/profils")
+    except OSError as e:
+        print(f"Error:{e.strerror}")
 
 # Ouverture du fichier raster.
 with rasterio.open(raster_path) as src:
@@ -421,12 +428,12 @@ with rasterio.open(raster_path) as src:
                     circularity = (4 * np.pi * area) / perimeter**2
                     circularity = round(circularity,2)
 
-                    if (0.95<= circularity <=1) :
+                    if 0.97 <= circularity <= 1:
 
         ### PENTE
 
                         slopes = []
-                        for i in range (int(len(max_value)/2)) :
+                        for i in range(int(len(max_value)/2)):
 
                             # Calcul de la distance entre les points des crêtes opposées
                             dist = calcul_distance(max_coord_relative[i], max_coord_relative[i+18])
@@ -585,7 +592,7 @@ with rasterio.open(raster_path) as src:
         ### CREATION DES PROFILS TOPOGRAPHIQUES
 
                             all_profiles = []
-                            min_X = [0] * 1000          # Trouver une variable plus exacte aue 1000
+                            min_X = [0] * 1000          # Trouver une variable plus exacte que 1000
 
             ### Creation des 18 profils du cratere
                             for i in range(int(len(profils) / 2)):
@@ -593,6 +600,8 @@ with rasterio.open(raster_path) as src:
                                 demi_profil = profils[i + 18]
 
                                 reversed_demi_profil = list(reversed(profils[i]))[:-1]
+
+                                limit_profil = len(reversed_demi_profil)
 
                                 demi_x_positif = list(range(len(demi_profil)))
                                 demi_x_negatif = list(reversed([(valeur + 1 ) * -1 for valeur in list(range(len(reversed_demi_profil)))]))
@@ -617,10 +626,16 @@ with rasterio.open(raster_path) as src:
                                 plt.grid(True)
 
                                 # Gestion des dossiers
-                                if not os.path.exists("results/RG" + zone + "/profils/" + str(id)):
-                                    os.makedirs("results/RG" + zone + "/profils/" + str(id))
+                                if swirl_on_or_off == 'on_swirl' :
+                                    path = "results/RG" + zone + "/profils/on_swirl/" + str(id)
+                                    if not os.path.exists(path):
+                                        os.makedirs(path)
+                                else:
+                                    path = "results/RG" + zone + "/profils/off_swirl/" + str(id)
+                                    if not os.path.exists(path):
+                                        os.makedirs(path)
 
-                                plt.savefig("results/RG" + zone + "/profils/" + str(id) +"/Profil_" + str(i * 10) +"_" + str((i + 18) * 10) +".png")
+                                plt.savefig(path +"/Profil_" + str(i * 10) +"_" + str((i + 18) * 10) +".png")
                                 plt.close()
 
             ### Adaptation des profils pour le moyennage futur
@@ -631,9 +646,8 @@ with rasterio.open(raster_path) as src:
                                     if excedant % 2 == 0:
                                         profil_individuel = profil_individuel[int(excedant/2) : - int(excedant/2)]
                                     else:
-                                        index = np.where(profil_individuel == min_val)
 
-                                        if len(profil_individuel)/2 < index[0]:
+                                        if len(profil_individuel)/2 < limit_profil:
                                             profil_individuel = profil_individuel[math.ceil(excedant/2) : - int(excedant/2)]
                                         else :
                                             profil_individuel = profil_individuel[int(excedant / 2): - math.ceil(excedant / 2)]
@@ -649,7 +663,7 @@ with rasterio.open(raster_path) as src:
                             plt.ylabel("Altitude")
                             plt.title("Moyenne des profils topographiques")
                             plt.grid(True)
-                            plt.savefig("results/RG" + zone + "/profils/" + str(id) + "/Profil_moyen.png")
+                            plt.savefig(path + "/Profil_moyen.png")
                             plt.close()
 
 
