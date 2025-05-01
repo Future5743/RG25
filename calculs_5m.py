@@ -32,7 +32,7 @@ from tqdm import tqdm
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
-zone = '2'
+zone = '7'
 
 if zone in ['1,2,3,4']:
     pixel_size_tb = 2
@@ -110,6 +110,12 @@ if os.path.exists("results/RG" + zone + "/profils"):
     except OSError as e:
         print(f"Error:{e.strerror}")
 
+if os.path.exists("results/RG" + zone + "/TRI"):
+    try:
+        shutil.rmtree("results/RG" + zone + "/TRI")
+    except OSError as e:
+        print(f"Error:{e.strerror}")
+
 
 # Ouverture du fichier raster.
 with rasterio.open(raster_path) as src:
@@ -127,6 +133,7 @@ with rasterio.open(raster_path) as src:
         nac_id =        crater['NAC_DTM_ID']
         center_x_dl =   crater['center_lon']
         center_y_dl =   crater['center_lat']
+        ray = crater['ray_maxdia']
 
         # Découper le raster en utilisant le polygone
         out_image, out_transform = mask(src, geometry_cr, crop=True)
@@ -697,6 +704,74 @@ with rasterio.open(raster_path) as src:
                             plt.grid(True)
                             plt.savefig(path + "/Profil_moyen.png")
                             plt.close()
+
+        ### ALGORITHME TRI
+                            coord1 = [center_x_dl - ray, center_y_dl - ray]
+                            coord2 = [center_x_dl + ray, center_y_dl - ray]
+                            coord3 = [center_x_dl + ray, center_y_dl + ray]
+                            coord4 = [center_x_dl - ray, center_y_dl + ray]
+
+                            emporte_piece = [Polygon([coord1, coord2, coord3, coord4, coord1])]
+
+                            # Découper le raster en utilisant le polygone
+                            out_image, out_transform = mask(src, emporte_piece, crop=True)
+
+                            # Ignorer les valeurs "no data" (à confirmer si j'ai besoin de cette ligne)
+                            masked_image_square = np.ma.masked_equal(out_image, no_data_value)
+
+                            DTM_mean = []
+                            DTM_range = []
+
+                            for y in range(1, masked_image.shape[1] - 1):
+
+                                row_mean = []
+                                row_range = []
+
+                                for x in range(1, masked_image.shape[2] - 1):
+                                    window = [masked_image_square[:, y + 1, x - 1],
+                                              masked_image_square[:, y + 1, x],
+                                              masked_image_square[:, y + 1, x + 1],
+                                              masked_image_square[:, y, x - 1],
+                                              masked_image_square[:, y, x + 1],
+                                              masked_image_square[:, y - 1, x - 1],
+                                              masked_image_square[:, y - 1, x],
+                                              masked_image_square[:, y - 1, x + 1]]
+
+                                    row_mean.append(np.mean(window))
+
+                                    row_range.append(np.std(window))
+
+                                DTM_mean.append(row_mean)
+                                DTM_range.append(row_range)
+
+                            DTM_mean = np.array(DTM_mean)
+
+                            DTM_range = np.array(DTM_range)
+
+                            print(DTM_mean.shape)
+                            print(DTM_range.shape)
+                            print(masked_image_square[0][1:-1, 1:-1].shape)
+
+                            try:
+                                TRI = (masked_image_square[0][1:-1, 1:-1] - DTM_mean) / DTM_range
+
+                                fig, ax = plt.subplots()
+
+                                # Afficher les données avec la colormap viridis inversée
+                                cax = ax.imshow(TRI, cmap='viridis_r', vmin=-0.25, vmax=0.25)
+
+                                # Ajouter une barre de couleur
+                                fig.colorbar(cax)
+                                plt.title("Indice TRI sur le cratère " + str(id) + " de la zone RG" + zone)
+
+                                if not os.path.exists("results/RG" + zone + "/TRI"):
+                                    os.makedirs("results/RG" + zone + "/TRI")
+
+                                plt.savefig("results/RG" + zone + "/TRI/TRI_" + str(id) +".png")
+                                plt.close()
+                            except:
+                                pass
+
 
         ### MISE EN PLACE DES DATAS POUR LA CREATION FUTURE DES SHAPEFILE
                             angle = 0
