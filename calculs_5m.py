@@ -18,19 +18,17 @@ import math
 
 import rasterio
 
-from rasterio.crs import CRS
-
 from rasterio.mask import mask
-
-from rasterio.transform import from_origin
 
 import numpy as np
 
 from shapely.geometry import Point, LineString, Polygon
 
-from shapely.geometry.polygon import orient
-
 from tqdm import tqdm
+
+from TRI import TRI
+
+from Profils_topo import profils_topo
 
 ######################################################################################################################################################################################
 #################################################################################### DATA OPENING ####################################################################################
@@ -617,175 +615,10 @@ with rasterio.open(raster_path) as src:
 
         ### CREATION DES PROFILS TOPOGRAPHIQUES
 
-                            all_profiles = []
-                            min_X = [0] * 1000          # Trouver une variable plus exacte que 1000
-
-            ### Creation des 18 profils du cratere
-                            for i in range(int(len(profils) / 2)):
-
-                                X = []
-
-                                demi_profil = profils[i + 18]
-
-
-                                reversed_demi_profil = list(reversed(profils[i]))[:-1]
-
-                                limit_profil = len(reversed_demi_profil)
-
-                                demi_profils_coords_relatives[i][0] = list(reversed(demi_profils_coords_relatives[i][0]))[:-1]
-                                demi_profils_coords_relatives[i][1] = list(reversed(demi_profils_coords_relatives[i][1]))[:-1]
-
-
-                                demi_profils_coords_relatives[i + 18][0] = list(demi_profils_coords_relatives[i + 18][0])
-                                demi_profils_coords_relatives[i + 18][1] = list(demi_profils_coords_relatives[i + 18][1])
-
-                                profils_coords_relatives_rr = demi_profils_coords_relatives[i][0] + demi_profils_coords_relatives[i + 18][0]
-                                profils_coords_relatives_cc = demi_profils_coords_relatives[i][1] + demi_profils_coords_relatives[i + 18][1]
-
-
-                                for pixel in range(len(profils_coords_relatives_rr)):
-                                    dist = calcul_distance([profils_coords_relatives_rr[0], profils_coords_relatives_cc[0]],
-                                                           [profils_coords_relatives_rr[pixel], profils_coords_relatives_cc[pixel]], pixel_size_tb)
-                                    X.append(dist)
-
-
-                                if len(X) < len(min_X):
-                                    min_X = X
-
-                                # Gestion du profil
-                                profil = reversed_demi_profil + demi_profil
-
-                                profil = [x if isinstance(x, np.float32) else np.nan for x in profil]
-
-                                all_profiles.append(profil)
-
-                                # Création de la figure
-                                plt.figure(figsize=(40, 15))
-                                plt.plot(X, profil, marker='x')
-                                plt.xlabel("Distance (m)")
-                                plt.ylabel("Altitude")
-                                plt.title("Profil topographique pour les angles " + str(i * 10) + " et " + str((i + 18) * 10))
-                                plt.grid(True)
-
-                                # Gestion des dossiers
-                                if swirl_on_or_off == 'on-swirl' :
-                                    path = "results/RG" + zone + "/profils/on_swirl/" + str(id)
-                                    if not os.path.exists(path):
-                                        os.makedirs(path)
-                                else:
-                                    path = "results/RG" + zone + "/profils/off_swirl/" + str(id)
-                                    if not os.path.exists(path):
-                                        os.makedirs(path)
-
-                                plt.savefig(path +"/Profil_" + str(i * 10) +"_" + str((i + 18) * 10) +".png")
-                                plt.close()
-
-            ### Adaptation des profils pour le moyennage futur
-                            for profil_individuel in all_profiles:
-                                if len(profil_individuel) > len(min_X):
-                                    excedant = len(profil_individuel) - len(min_X)
-
-                                    if excedant % 2 == 0:
-                                        profil_individuel = profil_individuel[int(excedant/2) : - int(excedant/2)]
-                                    else:
-
-                                        if len(profil_individuel)/2 < limit_profil:
-                                            profil_individuel = profil_individuel[math.ceil(excedant/2) : - int(excedant/2)]
-                                        else :
-                                            profil_individuel = profil_individuel[int(excedant / 2): - math.ceil(excedant / 2)]
-
-            ### Moyennage des profils
-                            profil_moyen = []
-                            for x in range(len(min_X)) :
-                                colonne_i = [sous_liste[x] for sous_liste in all_profiles]
-                                profil_moyen.append(np.mean(colonne_i))
-
-                            plt.figure(figsize=(40,15))
-                            plt.plot(min_X, profil_moyen, marker='x')
-                            plt.xlabel("Distance (m)")
-                            plt.ylabel("Altitude")
-                            plt.title("Moyenne des profils topographiques")
-                            plt.grid(True)
-                            plt.savefig(path + "/Profil_moyen.png")
-                            plt.close()
+                            profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
 
         ### ALGORITHME TRI
-                            coord1 = [center_x_dl - ray, center_y_dl - ray]
-                            coord2 = [center_x_dl + ray, center_y_dl - ray]
-                            coord3 = [center_x_dl + ray, center_y_dl + ray]
-                            coord4 = [center_x_dl - ray, center_y_dl + ray]
-
-                            emporte_piece = [Polygon([coord1, coord2, coord3, coord4, coord1])]
-
-                            # Découper le raster en utilisant le polygone
-                            out_image, out_transform = mask(src, emporte_piece, crop=True)
-
-                            # Ignorer les valeurs "no data"
-                            masked_image_square = np.ma.masked_equal(out_image, no_data_value)
-
-                            DTM_mean = []
-                            DTM_range = []
-
-                            for y in range(1, masked_image_square.shape[1] - 1):
-
-                                row_mean = []
-                                row_range = []
-
-                                for x in range(1, masked_image_square.shape[2] - 1):
-                                    window = [masked_image_square[:, y + 1, x - 1],
-                                              masked_image_square[:, y + 1, x],
-                                              masked_image_square[:, y + 1, x + 1],
-                                              masked_image_square[:, y, x - 1],
-                                              masked_image_square[:, y, x + 1],
-                                              masked_image_square[:, y - 1, x - 1],
-                                              masked_image_square[:, y - 1, x],
-                                              masked_image_square[:, y - 1, x + 1]]
-
-                                    row_mean.append(np.mean(window))
-
-                                    row_range.append(np.std(window))
-
-                                DTM_mean.append(row_mean)
-                                DTM_range.append(row_range)
-
-                            DTM_mean = np.array(DTM_mean)
-
-                            DTM_range = np.array(DTM_range)
-
-                            TRI = (masked_image_square[0][1:-1, 1:-1] - DTM_mean) / DTM_range
-
-                            fig, ax = plt.subplots()
-
-                            # Afficher les données avec la colormap viridis inversée
-                            cax = ax.imshow(TRI, cmap='viridis_r', vmin=-0.25, vmax=0.25)
-
-                            # Ajouter une barre de couleur
-                            fig.colorbar(cax)
-                            plt.title("Indice TRI sur le cratère " + str(id) + " de la zone RG" + zone)
-
-                            if not os.path.exists("results/RG" + zone + "/TRI"):
-                                os.makedirs("results/RG" + zone + "/TRI")
-
-                            plt.savefig("results/RG" + zone + "/TRI/TRI_" + str(id) +".png")
-                            plt.close()
-
-                            upper_left_x, upper_left_y = coord4
-
-                            transform = from_origin(upper_left_x, upper_left_y, pixel_size_tb, pixel_size_tb)
-
-                            with rasterio.open(
-                                'results/RG' + zone + '/TRI/TRI_' + str(id) + '.tif',
-                                'w',
-                                driver='GTiff',
-                                height=TRI.shape[0],
-                                width=TRI.shape[1],
-                                count=1,
-                                dtype=TRI.dtype,
-                                crs=craters.crs,
-                                transform=transform
-                            ) as dst:
-                                dst.write(TRI, 1)
-
+                            TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
 
         ### MISE EN PLACE DES DATAS POUR LA CREATION FUTURE DES SHAPEFILE
                             angle = 0
