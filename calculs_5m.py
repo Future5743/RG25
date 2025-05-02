@@ -103,12 +103,13 @@ np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 ######################################################################################################################################################################################
 ######################################################################################## CODE ########################################################################################
 ######################################################################################################################################################################################
-
+'''
 if os.path.exists("results/RG" + zone + "/profils"):
     try:
         shutil.rmtree("results/RG" + zone + "/profils")
     except OSError as e:
         print(f"Error:{e.strerror}")
+'''
 
 if os.path.exists("results/RG" + zone + "/TRI"):
     try:
@@ -613,6 +614,7 @@ with rasterio.open(raster_path) as src:
 
         ### CREATION DES PROFILS TOPOGRAPHIQUES
 
+                            '''                            
                             all_profiles = []
                             min_X = [0] * 1000          # Trouver une variable plus exacte que 1000
 
@@ -704,6 +706,7 @@ with rasterio.open(raster_path) as src:
                             plt.grid(True)
                             plt.savefig(path + "/Profil_moyen.png")
                             plt.close()
+                            '''
 
         ### ALGORITHME TRI
                             coord1 = [center_x_dl - ray, center_y_dl - ray]
@@ -716,18 +719,18 @@ with rasterio.open(raster_path) as src:
                             # Découper le raster en utilisant le polygone
                             out_image, out_transform = mask(src, emporte_piece, crop=True)
 
-                            # Ignorer les valeurs "no data" (à confirmer si j'ai besoin de cette ligne)
+                            # Ignorer les valeurs "no data"
                             masked_image_square = np.ma.masked_equal(out_image, no_data_value)
 
                             DTM_mean = []
                             DTM_range = []
 
-                            for y in range(1, masked_image.shape[1] - 1):
+                            for y in range(1, masked_image_square.shape[1] - 1):
 
                                 row_mean = []
                                 row_range = []
 
-                                for x in range(1, masked_image.shape[2] - 1):
+                                for x in range(1, masked_image_square.shape[2] - 1):
                                     window = [masked_image_square[:, y + 1, x - 1],
                                               masked_image_square[:, y + 1, x],
                                               masked_image_square[:, y + 1, x + 1],
@@ -748,29 +751,22 @@ with rasterio.open(raster_path) as src:
 
                             DTM_range = np.array(DTM_range)
 
-                            print(DTM_mean.shape)
-                            print(DTM_range.shape)
-                            print(masked_image_square[0][1:-1, 1:-1].shape)
+                            TRI = (masked_image_square[0][1:-1, 1:-1] - DTM_mean) / DTM_range
 
-                            try:
-                                TRI = (masked_image_square[0][1:-1, 1:-1] - DTM_mean) / DTM_range
+                            fig, ax = plt.subplots()
 
-                                fig, ax = plt.subplots()
+                            # Afficher les données avec la colormap viridis inversée
+                            cax = ax.imshow(TRI, cmap='viridis_r', vmin=-0.25, vmax=0.25)
 
-                                # Afficher les données avec la colormap viridis inversée
-                                cax = ax.imshow(TRI, cmap='viridis_r', vmin=-0.25, vmax=0.25)
+                            # Ajouter une barre de couleur
+                            fig.colorbar(cax)
+                            plt.title("Indice TRI sur le cratère " + str(id) + " de la zone RG" + zone)
 
-                                # Ajouter une barre de couleur
-                                fig.colorbar(cax)
-                                plt.title("Indice TRI sur le cratère " + str(id) + " de la zone RG" + zone)
+                            if not os.path.exists("results/RG" + zone + "/TRI"):
+                                os.makedirs("results/RG" + zone + "/TRI")
 
-                                if not os.path.exists("results/RG" + zone + "/TRI"):
-                                    os.makedirs("results/RG" + zone + "/TRI")
-
-                                plt.savefig("results/RG" + zone + "/TRI/TRI_" + str(id) +".png")
-                                plt.close()
-                            except:
-                                pass
+                            plt.savefig("results/RG" + zone + "/TRI/TRI_" + str(id) +".png")
+                            plt.close()
 
 
         ### MISE EN PLACE DES DATAS POUR LA CREATION FUTURE DES SHAPEFILE
