@@ -18,7 +18,11 @@ import math
 
 import rasterio
 
+from rasterio.crs import CRS
+
 from rasterio.mask import mask
+
+from rasterio.transform import from_origin
 
 import numpy as np
 
@@ -32,7 +36,7 @@ from tqdm import tqdm
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
-zone = '7'
+zone = '2'
 
 if zone in ['1,2,3,4']:
     pixel_size_tb = 2
@@ -768,6 +772,23 @@ with rasterio.open(raster_path) as src:
                             plt.savefig("results/RG" + zone + "/TRI/TRI_" + str(id) +".png")
                             plt.close()
 
+                            upper_left_x, upper_left_y = coord4
+
+                            transform = from_origin(upper_left_x, upper_left_y, pixel_size_tb, pixel_size_tb)
+
+                            with rasterio.open(
+                                'results/RG' + zone + '/TRI/TRI_' + str(id) + '.tif',
+                                'w',
+                                driver='GTiff',
+                                height=TRI.shape[0],
+                                width=TRI.shape[1],
+                                count=1,
+                                dtype=TRI.dtype,
+                                crs=craters.crs,
+                                transform=transform
+                            ) as dst:
+                                dst.write(TRI, 1)
+
 
         ### MISE EN PLACE DES DATAS POUR LA CREATION FUTURE DES SHAPEFILE
                             angle = 0
@@ -777,8 +798,8 @@ with rasterio.open(raster_path) as src:
                                                               'run_id': id, 'NAC_DTM_ID': nac_id}))
                                 angle += 10
 
-                            centers.append(({'geometry': coord_center_geom, 'position': "centre",
-                                             'run_id': id, 'NAC_DTM_ID': nac_id}))
+                            centers.append(({'geometry': coord_center_geom,'run_id': id, 'center_lon': center_x_dl,
+                                             'center_lat': center_y_dl}))
 
                             rim_approx.append(({'geometry': rim_approx_geom, 'run_id': id, 'NAC_DTM_ID': nac_id}))
 
