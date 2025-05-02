@@ -22,6 +22,40 @@ from shapely.geometry.polygon import orient
 ######################################################################################################################################################################################
 #################################################################################### LIST CREATION ###################################################################################
 ######################################################################################################################################################################################
+def draw_TRI(TRI, id, zone):
+    fig, ax = plt.subplots()
+
+    # Afficher les données avec la colormap viridis inversée
+    cax = ax.imshow(TRI, cmap='viridis_r', vmin=-0.25, vmax=0.25)
+
+    # Ajouter une barre de couleur
+    fig.colorbar(cax)
+    plt.title("Indice TRI sur le cratère " + str(id) + " de la zone RG" + zone)
+
+    if not os.path.exists("results/RG" + zone + "/TRI"):
+        os.makedirs("results/RG" + zone + "/TRI")
+
+    plt.savefig("results/RG" + zone + "/TRI/TRI_" + str(id) + ".png")
+    plt.close()
+
+
+def array_to_GeoTIF(TRI, coord_left_down, pixel_size_tb, id, zone, crs):
+    upper_left_x, upper_left_y = coord_left_down
+
+    transform = from_origin(upper_left_x, upper_left_y, pixel_size_tb, pixel_size_tb)
+
+    with rasterio.open(
+            'results/RG' + zone + '/TRI/TRI_' + str(id) + '.tif',
+            'w',
+            driver='GTiff',
+            height=TRI.shape[0],
+            width=TRI.shape[1],
+            count=1,
+            dtype=TRI.dtype,
+            crs=crs,
+            transform=transform
+    ) as dst:
+        dst.write(TRI, 1)
 
 def TRI (center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, crs) :
     coord1 = [center_x_dl - ray, center_y_dl - ray]
@@ -68,34 +102,7 @@ def TRI (center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, z
 
     TRI = (masked_image_square[0][1:-1, 1:-1] - DTM_mean) / DTM_range
 
-    fig, ax = plt.subplots()
+    draw_TRI(TRI, id, zone)
 
-    # Afficher les données avec la colormap viridis inversée
-    cax = ax.imshow(TRI, cmap='viridis_r', vmin=-0.25, vmax=0.25)
+    array_to_GeoTIF(TRI, coord4, pixel_size_tb, id, zone, crs)
 
-    # Ajouter une barre de couleur
-    fig.colorbar(cax)
-    plt.title("Indice TRI sur le cratère " + str(id) + " de la zone RG" + zone)
-
-    if not os.path.exists("results/RG" + zone + "/TRI"):
-        os.makedirs("results/RG" + zone + "/TRI")
-
-    plt.savefig("results/RG" + zone + "/TRI/TRI_" + str(id) + ".png")
-    plt.close()
-
-    upper_left_x, upper_left_y = coord4
-
-    transform = from_origin(upper_left_x, upper_left_y, pixel_size_tb, pixel_size_tb)
-
-    with rasterio.open(
-            'results/RG' + zone + '/TRI/TRI_' + str(id) + '.tif',
-            'w',
-            driver='GTiff',
-            height=TRI.shape[0],
-            width=TRI.shape[1],
-            count=1,
-            dtype=TRI.dtype,
-            crs=crs,
-            transform=transform
-    ) as dst:
-        dst.write(TRI, 1)
