@@ -107,13 +107,12 @@ np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 ######################################################################################################################################################################################
 ######################################################################################## CODE ########################################################################################
 ######################################################################################################################################################################################
-'''
 if os.path.exists("results/RG" + zone + "/profils"):
     try:
         shutil.rmtree("results/RG" + zone + "/profils")
     except OSError as e:
         print(f"Error:{e.strerror}")
-'''
+
 
 if os.path.exists("results/RG" + zone + "/TRI"):
     try:
@@ -618,7 +617,6 @@ with rasterio.open(raster_path) as src:
 
         ### CREATION DES PROFILS TOPOGRAPHIQUES
 
-                            '''                            
                             all_profiles = []
                             min_X = [0] * 1000          # Trouver une variable plus exacte que 1000
 
@@ -710,7 +708,6 @@ with rasterio.open(raster_path) as src:
                             plt.grid(True)
                             plt.savefig(path + "/Profil_moyen.png")
                             plt.close()
-                            '''
 
         ### ALGORITHME TRI
                             coord1 = [center_x_dl - ray, center_y_dl - ray]
