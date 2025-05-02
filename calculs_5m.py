@@ -38,7 +38,7 @@ from tqdm import tqdm
 
 zone = '2'
 
-if zone in ['1,2,3,4']:
+if zone in ['1', '2', '3', '4']:
     pixel_size_tb = 2
 else :
     pixel_size_tb = 5
