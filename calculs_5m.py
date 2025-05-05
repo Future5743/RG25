@@ -223,14 +223,32 @@ with rasterio.open(raster_path) as src:
 
                     return distance_in_meters_tb
 
-                for i in range(int(len(max_coord_relative)/2)) :
-                    D.append(calcul_distance(max_coord_relative[i], max_coord_relative[i+18], pixel_size_tb))
+                delta_pixel = 1  # incertitude sur chaque coordonnée (en pixels)
+                incertitudes_individuelles = []
+
+                for i in range(int(len(max_coord_relative) / 2)):
+                    pos1 = max_coord_relative[i]
+                    pos2 = max_coord_relative[i + 18]
+
+                    d = calcul_distance(pos1, pos2, pixel_size_tb)
+                    D.append(d)
+
+                    # incertitude sur la distance (d) en mètres
+                    delta_d = pixel_size_tb * np.sqrt(2) * delta_pixel
+                    incertitudes_individuelles.append(delta_d)
 
                 D = np.array(D)
+                incertitudes_individuelles = np.array(incertitudes_individuelles)
 
+                # Moyenne des diamètres
                 moy_diam = round(np.mean(D), 2)
 
-                # Calcul du rayon de la moyenne des diamètres
+                # Incertitude sur la moyenne
+                sigma_D = np.std(D, ddof=1)
+                N = len(D)
+                incertitude_moy_diam = round(sigma_D / np.sqrt(N), 2)
+
+        # Calcul du rayon de la moyenne des diamètres
                 ray_largest_diam = round(moy_diam / 2, 1)
 
                 if calcul_distance(lowest_point_coord, coord_center, pixel_size_tb) < moy_diam * 0.25 and moy_diam >= 40:
@@ -333,12 +351,16 @@ with rasterio.open(raster_path) as src:
                         #     print(f"Distance entre le point haut au Nord et le point bas au centre : {distance_centre_haut} mètres", id)
 
                     # PROFONDEUR MOYENNE DU CRATERE
+
                             moyenne_altitude = round(np.mean(max_value), 4)
-
                             prof_moyen_crat = round(moyenne_altitude - min_val, 3)
+                            delta_prof = np.sqrt(2) * pixel_size_tb  # propagation verticale
 
-                    # RATIO d/D - calcul du ratio d/D
                             ratio_dD = round(prof_moyen_crat / moy_diam, 3)
+                            rel_err_prof = delta_prof / prof_moyen_crat
+                            rel_err_diam = incertitude_moy_diam / moy_diam
+                            rel_err_ratio = np.sqrt(rel_err_prof ** 2 + rel_err_diam ** 2)
+                            delta_dD = round(rel_err_ratio * ratio_dD, 4)
 
                     # Ajouter les informations de Pente à la liste results_pente
                     #         results_pente.append({'run_ID': id,
@@ -412,10 +434,10 @@ with rasterio.open(raster_path) as src:
 
         ### CREATION DES PROFILS TOPOGRAPHIQUES
 
-                            profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
+                            # profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
 
         ### ALGORITHME TRI
-                            TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
+                            # TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
 
         ### MISE EN PLACE DES DATAS POUR LA CREATION FUTURE DES SHAPEFILE
                             angle = 0
@@ -445,8 +467,11 @@ with rasterio.open(raster_path) as src:
                                                             'center_lat': center_y_dl,
                                                             'ray_maxdia': ray_largest_diam,
                                                             'moyen_diam': int(moy_diam),
+                                                            'incer_D': incertitude_moy_diam,
+                                                            'incer_d': delta_prof,
                                                             'prof_moyen': round(prof_moyen_crat, 1),
                                                             'ratio_dD': ratio_dD,
+                                                            'incer_dD': delta_dD,
                                                             'circularit': circularity,
                                                             'pente_rim': max_slope_crater,
                                                             'swirl': swirl_on_or_off,
