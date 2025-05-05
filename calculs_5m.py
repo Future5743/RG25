@@ -22,11 +22,13 @@ from shapely.geometry import Point, LineString, Polygon
 
 from tqdm import tqdm
 
+from Circularity import Miller_index
+
 from Slopes import max_crater_slopes_calculation
 
 from TRI import TRI
 
-from Profils_topo import profils_topo
+from topographical_profiles import profils_topo
 
 ######################################################################################################################################################################################
 #################################################################################### DATA OPENING ####################################################################################
@@ -419,34 +421,8 @@ with rasterio.open(raster_path) as src:
                     distance_right_left = calculate_pixel_distance_lr(max_pos_right, max_pos_left)
                     '''
 
-                # Calcul du perimetre et de l'aire du polygone
-
-                    perimeter = 0
-                    area = 0
-
-                    for i in range(len(max_coord_relative) - 1) :
-
-                        # Calcul de distance pour le perimetre et la formule de Heron
-                        da = calcul_distance(max_coord_relative[i], max_coord_relative[i+1], pixel_size_tb)
-                        db = calcul_distance(min_pos, max_coord_relative[i], pixel_size_tb)
-                        dc = calcul_distance(min_pos, max_coord_relative[i+1], pixel_size_tb)
-
-                        # Formule de Heron
-                        p = (da + db + dc)/2
-
-                        S = np.sqrt(p * (p - da) * (p - db) * (p-dc))
-
-                        # Perimetre
-                        perimeter += da
-
-                        # Aire
-                        area += S
-
-                    perimeter = round(perimeter, 2)
-                    area = round(area, 2)
-
                 # Calcul de l'indice de circularité de Miller
-                    circularity = (4 * np.pi * area) / perimeter**2
+                    circularity = Miller_index(min_pos, max_coord_relative, pixel_size_tb)
                     circularity = round(circularity, 2)
 
                     if 0.99 <= circularity <= 1:
