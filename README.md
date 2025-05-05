@@ -17,7 +17,7 @@
 >>> 📁 on-swirl -- This folder contains the profiles of he crater in the on-swirl zone \
 >>> 📁 off-swirl -- This folder contains the profiles of he crater in the off-swirl zone
 >>>> 📁id -- This folder contains the profiles of the crater of a specific id
->> 📁 TRI -- This folder contains the TRI images of the craters of RG2
+< 📁 TRI -- This folder contains the TRI images of the craters of RG2
 > 📁 RG7 -- This folder contains results of RG7 \
 >> 📁 profils -- This folder contains the craters profiles of RG7\
 >> 📁 TRI -- This folder contains the TRI images of the craters of RG7
