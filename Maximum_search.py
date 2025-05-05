@@ -8,11 +8,94 @@ import rasterio
 
 import numpy as np
 
-from shapely.geometry import Point, LineString, Polygon
+from shapely.geometry import Point, LineString
 
 ######################################################################################################################################################################################
 ######################################################################################## CODE ########################################################################################
 ######################################################################################################################################################################################
+def Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value, max_coord_relative, max_coord_real, max_geom, line_geom, profils, demi_profils_coords_relatives):
+
+    lowest_point_coord = None
+    min_geom = None
+
+    # Initialisation de l'angle étudié pour former les profils
+    angle = 0
+
+    # Attribition de variables pour les coordonnées relatives du lowest point
+    x0, y0 = min_pos[1], min_pos[2]
+
+    # Boucle pour étudier des profils tous les 10°
+    for i in range(36):
+
+        # Convertion de l'angle en radian
+        angle_rad = np.deg2rad(angle)
+
+        # Coordonnées des points à l'extremité du profil
+        x1 = int(x0 + D * np.cos(angle_rad))
+        y1 = int(y0 + D * np.sin(angle_rad))
+
+        # Ajustement du profil à masked_image
+        while True:
+            try:
+                masked_image[0, x1, y1]
+                break
+            except:
+                D = D * 0.99  # Réduction de la longueur du profil de 1%
+                x1 = int(x0 + D * np.cos(angle_rad))
+                y1 = int(y0 + D * np.sin(angle_rad))
+
+        # Définition de la ligne du profil étudié
+        rr, cc = sk.draw.line(x0, y0, x1, y1)
+
+        demi_profils_coords_relatives.append([rr, cc])
+
+        line_value = masked_image[0, rr, cc]  # Extraction des altitudes de la ligne
+
+        profils.append(list(line_value))  # On ajoute chaque demi-profil à la liste profils
+
+        # Ajout de 10° à l'angle
+        angle += 10
+
+        # On exclue les cratères dont les lignes de profils contiennent moins de 3 pixels
+        if line_value.shape[0] > 3:
+
+            # Extraction de l'altitude maximale
+            maximum = np.max(line_value)
+
+            # Recalcul du maximum si celui-ci correspond à un des trois derniers pixels de la ligne de profil
+            while maximum == line_value[-1] or maximum == line_value[-2] or maximum == line_value[-3]:
+                index = np.where(line_value == maximum)
+
+                line_value[index] = - np.inf
+
+                maximum = np.max(line_value)
+
+            # Exclusion des cratères où l'altitude maximale d'un profil est égale à l'altitude minimale
+            # (peut correspondre à une erreur de détection de YOLOv5)
+            if maximum != min_val:
+                max_value.append(round(maximum, 4))
+
+                index_max = np.where(masked_image[0, rr, cc] == maximum)
+
+                max_coordinates = (rr[index_max][0], cc[index_max][0])
+
+                max_coord_relative.append(max_coordinates)
+
+                max_real_coordinates = rasterio.transform.xy(out_transform, max_coordinates[0],
+                                                             max_coordinates[1])
+
+                max_coord_real.append(max_real_coordinates)
+
+                lowest_point_coord = rasterio.transform.xy(out_transform, rr[0], cc[0])
+                limit_point_coord = rasterio.transform.xy(out_transform, rr[-1], cc[-1])
+
+                # Ajout des géométries dans leur liste correspondantes
+                max_geom.append(Point(max_real_coordinates[0], max_real_coordinates[1]))
+                min_geom = Point(lowest_point_coord[0], lowest_point_coord[1])
+                line_geom.append(LineString([lowest_point_coord, limit_point_coord]))
+
+    return lowest_point_coord, min_geom
+
 
 def horizontal_90(min_pos, masked_image, no_data_value, out_transform):
     # Pour la ligne de pixels extraite, trouver les valeurs des colonnes à droite de la position minimale dans la même ligne
