@@ -8,13 +8,9 @@ import geopandas as gpd    # Import de la bibliothèque python "Geopandas". Perm
 
 import skimage as sk
 
-import matplotlib.pyplot as plt
-
 import os
 
 import shutil
-
-import math
 
 import rasterio
 
@@ -25,6 +21,8 @@ import numpy as np
 from shapely.geometry import Point, LineString, Polygon
 
 from tqdm import tqdm
+
+from Slopes import max_crater_slopes_calculation
 
 from TRI import TRI
 
@@ -244,7 +242,7 @@ with rasterio.open(raster_path) as src:
                     # Exclusion des cratères où l'altitude maximale d'un profil est égale à l'altitude minimale
                     # (peut correspondre à une erreur de détection de YOLOv5)
                     if maximum != min_val:
-                        max_value.append(maximum)
+                        max_value.append(round(maximum, 4))
 
                         index_max = np.where(masked_image[0, rr, cc] == maximum)
 
@@ -455,30 +453,9 @@ with rasterio.open(raster_path) as src:
 
         ### PENTE
 
-                        slopes = []
-                        for i in range(int(len(max_value)/2)):
+                        max_slope_crater = max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size_tb)
 
-                            # Calcul de la distance entre les points des crêtes opposées
-                            dist = calcul_distance(max_coord_relative[i], max_coord_relative[i+18], pixel_size_tb)
-
-                            # Trouver la plus basse et la plus haute altitude pour les profils tous les 10 m
-                            low_alt = min(max_value[i], max_value[i+18])
-                            high_alt = max(max_value[i], max_value[i+18])
-
-                            # Calcul de la difference d'altitudes
-                            diff_alt = round(high_alt-low_alt, 4)
-
-                            # Calcul de la pente
-                            slope_rad = round(np.arctan(diff_alt / dist), 4)
-
-                            # Convertion en degres
-                            slope_deg = round(np.rad2deg(slope_rad), 4)
-
-                            slopes.append(slope_deg)
-
-                        max_slope = np.max(slopes)
-
-                        if max_slope < 8:
+                        if max_slope_crater < 8:
 
                             '''
                         # Profil Horizontal
@@ -615,23 +592,29 @@ with rasterio.open(raster_path) as src:
 
         ### CREATION DES PROFILS TOPOGRAPHIQUES
 
-                            profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
+                            # profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
 
         ### ALGORITHME TRI
-                            TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
+                            # TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
 
         ### MISE EN PLACE DES DATAS POUR LA CREATION FUTURE DES SHAPEFILE
                             angle = 0
 
                             for line in line_geom:
-                                Lignes_visualisation.append(({'geometry': line, 'position': str(angle),
-                                                              'run_id': id, 'NAC_DTM_ID': nac_id}))
+                                Lignes_visualisation.append(({'geometry': line,
+                                                              'position': str(angle),
+                                                              'run_id': id,
+                                                              'NAC_DTM_ID': nac_id}))
                                 angle += 10
 
-                            centers.append(({'geometry': coord_center_geom,'run_id': id, 'center_lon': center_x_dl,
+                            centers.append(({'geometry': coord_center_geom,
+                                             'run_id': id,
+                                             'center_lon': center_x_dl,
                                              'center_lat': center_y_dl}))
 
-                            rim_approx.append(({'geometry': rim_approx_geom, 'run_id': id, 'NAC_DTM_ID': nac_id}))
+                            rim_approx.append(({'geometry': rim_approx_geom,
+                                                'run_id': id,
+                                                'NAC_DTM_ID': nac_id}))
 
                             # rim_approx_smooth.append(({'geometry': rim_approx_smooth_geom, 'run_id': id, 'NAC_DTM_ID': nac_id}))
 
@@ -641,23 +624,31 @@ with rasterio.open(raster_path) as src:
                                                             'center_lon': center_x_dl,
                                                             'center_lat': center_y_dl,
                                                             'ray_maxdia': ray_largest_diam,
-                                                            'moyen_diam': round(moy_diam, 0),
-                                                            'prof_moyen': prof_moyen_crat,
+                                                            'moyen_diam': int(moy_diam),
+                                                            'prof_moyen': round(prof_moyen_crat, 1),
                                                             'ratio_dD': ratio_dD,
                                                             'circularit': circularity,
-                                                            'pente_rim': max_slope,
+                                                            'pente_rim': max_slope_crater,
                                                             'swirl': swirl_on_or_off,
                                                             'hiesingerA': floor_age})
 
                             # Créer un objet Point
 
-                            lowest_points.append({'geometry': min_geom, 'alt': round(min_val, 1),
-                                                  'position': lowest_point_coord, 'run_id': id, 'NAC_DTM_ID': nac_id})
+                            lowest_points.append({'geometry': min_geom,
+                                                  'alt': round(min_val, 1),
+                                                  'position': lowest_point_coord,
+                                                  'run_id': id,
+                                                  'NAC_DTM_ID': nac_id})
 
                             for i in range(len(max_geom)):
 
-                                highest_points.append({'geometry': max_geom[i], 'max_alt': round(max_value[i], 1),
-                                                       'position': "point " + str(angle), 'run_id': id, 'NAC_DTM_ID': nac_id})
+                                highest_points.append({'geometry': max_geom[i],
+                                                       'long': max_coord_real[i][0],
+                                                       'lat': max_coord_real[i][1],
+                                                       'max_alt': round(max_value[i], 1),
+                                                       'position': "point à" + str(angle) + '°',
+                                                       'run_id': id,
+                                                       'NAC_DTM_ID': nac_id})
 
                                 angle += 10
 
