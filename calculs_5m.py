@@ -253,7 +253,7 @@ with rasterio.open(raster_path) as src:
 
                 D = np.array(D)
 
-                delta_D = pixel_size_tb * np.sqrt(2)
+                delta_D = np.sqrt(np.std(D)**2 + (pixel_size_tb * np.sqrt(2))**2)
 
                 # Average diameters
                 moy_diam = round(np.mean(D), 2)
@@ -458,10 +458,10 @@ with rasterio.open(raster_path) as src:
 
         ### CREATING TOPOGRAPHIC PROFILES
 
-                            # profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
+                            profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
 
         ### TRI ALGORITHM
-                            # TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
+                            TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
 
         ### SETTING UP DATA FOR FUTURE SHAPEFILE CREATION
                             angle = 0
@@ -491,9 +491,9 @@ with rasterio.open(raster_path) as src:
                                                             'center_lat': center_y_dl,
                                                             'ray_maxdia': ray_largest_diam,
                                                             'moyen_diam': int(moy_diam),
-                                                            'incer_D': rel_err_diam,
+                                                            'incer_D': incertitude_moy_diam,
                                                             'prof_moyen': round(prof_moyen_crat, 1),
-                                                            'incer_de': rel_err_prof,
+                                                            'incer_de': delta_prof,
                                                             'ratio_dD': ratio_dD,
                                                             'incer_dD': delta_dD,
                                                             'circularit': circularity,

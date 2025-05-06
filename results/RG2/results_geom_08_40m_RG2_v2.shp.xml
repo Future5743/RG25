@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata xml:lang="fr"><Esri><CreaDate>20250506</CreaDate><CreaTime>14540400</CreaTime><ArcGISFormat>1.0</ArcGISFormat><SyncOnce>TRUE</SyncOnce><DataProperties><lineage><Process ToolSource="c:\program files\arcgis\pro\Resources\ArcToolbox\toolboxes\Data Management Tools.tbx\CalculateField" Date="20250506" Time="145404">CalculateField results_python\RG2\results_geom_08_40m_RG2_v2 test !incer_dD!/!ratio_dD!*100 Python # "Float (32-bit floating point)" NO_ENFORCE_DOMAINS</Process></lineage></DataProperties></Esri></metadata>
