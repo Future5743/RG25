@@ -36,12 +36,33 @@ from Topographical_profiles import profils_topo
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
-zone = '7'
+zone = '2'
 
-if zone in ['1', '2', '3', '4']:
+if zone in ['2', '3', '4']:
     pixel_size_tb = 2
+
+    if zone == '2':
+        precision_error = 0.81
+
+    if zone == '3':
+        precision_error = 0.91
+
+    else:
+        precision_error = 0.87
 else:
     pixel_size_tb = 5
+
+    if zone == '1' :
+        precision_error = 5.1
+
+    if zone == '5':
+        precision_error = 2.54
+
+    if zone == '6':
+        precision_error = 2.34
+
+    else:
+        precision_error = 2.37
 
 # Stores the path of the “Buffer (large) craters” shapefile in a variable
 crater_shapefile_path = 'data/Buffer_crateres/Buffer_RG' + zone + '/'
@@ -223,9 +244,6 @@ with rasterio.open(raster_path) as src:
 
                     return distance_in_meters_tb
 
-                delta_pixel = 1  # uncertainty on each coordinate (in pixels)
-                incertitudes_individuelles = []
-
                 for i in range(int(len(max_coord_relative) / 2)):
                     pos1 = max_coord_relative[i]
                     pos2 = max_coord_relative[i + 18]
@@ -233,20 +251,16 @@ with rasterio.open(raster_path) as src:
                     d = calcul_distance(pos1, pos2, pixel_size_tb)
                     D.append(d)
 
-                    # distance uncertainty (d) in meters
-                    delta_d = pixel_size_tb * np.sqrt(2) * delta_pixel
-                    incertitudes_individuelles.append(delta_d)
-
                 D = np.array(D)
-                incertitudes_individuelles = np.array(incertitudes_individuelles)
+
+                delta_D = pixel_size_tb * np.sqrt(2)
 
                 # Average diameters
                 moy_diam = round(np.mean(D), 2)
 
                 # Uncertainty of average
-                sigma_D = np.std(D, ddof=1)
                 N = len(D)
-                incertitude_moy_diam = round(sigma_D / np.sqrt(N), 2)
+                incertitude_moy_diam = round(delta_D / np.sqrt(N), 2)           # Stopar et al., 2017
 
         # Calculation of the radius of the average diameter
                 ray_largest_diam = round(moy_diam / 2, 1)
@@ -357,11 +371,11 @@ with rasterio.open(raster_path) as src:
 
                             N = len(profondeurs) + 1
 
-                            sigma = np.std(profondeurs)
+                            sigma = np.sqrt(precision_error**2 + np.std(profondeurs)**2)
 
                             prof_moyen_crat = round(np.mean(profondeurs), 3)
 
-                            delta_prof = sigma / np.sqrt(N)
+                            delta_prof = sigma / np.sqrt(N)         # Hoover et al., 2024
 
                     # d/D CALCULATION
 
@@ -477,9 +491,9 @@ with rasterio.open(raster_path) as src:
                                                             'center_lat': center_y_dl,
                                                             'ray_maxdia': ray_largest_diam,
                                                             'moyen_diam': int(moy_diam),
-                                                            'incer_D': incertitude_moy_diam,
-                                                            'incer_d': delta_prof,
+                                                            'incer_D': rel_err_diam,
                                                             'prof_moyen': round(prof_moyen_crat, 1),
+                                                            'incer_de': rel_err_prof,
                                                             'ratio_dD': ratio_dD,
                                                             'incer_dD': delta_dD,
                                                             'circularit': circularity,
