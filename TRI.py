@@ -100,7 +100,13 @@ def TRI (center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, z
 
     DTM_range = np.array(DTM_range)
 
-    TRI = (masked_image_square[0][1:-1, 1:-1] - DTM_mean) / DTM_range
+    TRI = np.round((masked_image_square[0][1:-1, 1:-1] - DTM_mean) / DTM_range, decimals=3)
+
+    index = np.where(np.isnan(TRI) != False)
+    TRI[index] = 0
+
+    TRI = TRI[~np.all(TRI == 0, axis=1)]
+    TRI = TRI[:, ~np.all(TRI == 0, axis=0)]
 
     draw_TRI(TRI, id, zone)
 

@@ -36,11 +36,11 @@ from Topographical_profiles import profils_topo
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
-zone = '2'
+zone = '7'
 
 if zone in ['1', '2', '3', '4']:
     pixel_size_tb = 2
-else :
+else:
     pixel_size_tb = 5
 
 # Stores the path of the “Buffer (large) craters” shapefile in a variable
@@ -155,7 +155,7 @@ with rasterio.open(raster_path) as src:
         gdf_centre_crater = gdf_centre_crater.to_crs(hiesinger.crs)
 
         # If a crater has no Hiesinger data, it is ignored
-        if hiesinger_geom.contains(gdf_centre_crater['geometry'].iloc[0]).any() :
+        if hiesinger_geom.contains(gdf_centre_crater['geometry'].iloc[0]).any():
 
             for i in range(hiesinger_geom.shape[0]):
                 if hiesinger_geom.tolist()[i].contains(gdf_centre_crater['geometry'].iloc[0]):
@@ -167,7 +167,7 @@ with rasterio.open(raster_path) as src:
 
             swirl_on_or_off = 'off-swirl'
 
-            if swirls_geom.contains(gdf_centre_crater['geometry'].iloc[0]).any() :
+            if swirls_geom.contains(gdf_centre_crater['geometry'].iloc[0]).any():
                 swirl_on_or_off = 'on-swirl'
 
         ### LOWEST ELEVATION: Within the circle, find the lowest elevation and its position.
@@ -251,7 +251,8 @@ with rasterio.open(raster_path) as src:
         # Calculation of the radius of the average diameter
                 ray_largest_diam = round(moy_diam / 2, 1)
 
-                if calcul_distance(lowest_point_coord, coord_center, pixel_size_tb) < moy_diam * 0.25 and moy_diam >= 40:
+                if calcul_distance(lowest_point_coord, coord_center, pixel_size_tb) < moy_diam * 0.25 \
+                        and moy_diam >= 40:
 
                     '''
                 # Profil vertical
@@ -352,11 +353,20 @@ with rasterio.open(raster_path) as src:
 
                     # AVERAGE CRATER DEPTH
 
-                            moyenne_altitude = round(np.mean(max_value), 4)
-                            prof_moyen_crat = round(moyenne_altitude - min_val, 3)
-                            delta_prof = np.sqrt(2) * pixel_size_tb  # propagation verticale
+                            profondeurs = max_value - min_val
+
+                            N = len(profondeurs) + 1
+
+                            sigma = np.std(profondeurs)
+
+                            prof_moyen_crat = round(np.mean(profondeurs), 3)
+
+                            delta_prof = sigma / np.sqrt(N)
+
+                    # d/D CALCULATION
 
                             ratio_dD = round(prof_moyen_crat / moy_diam, 3)
+
                             rel_err_prof = delta_prof / prof_moyen_crat
                             rel_err_diam = incertitude_moy_diam / moy_diam
                             rel_err_ratio = np.sqrt(rel_err_prof ** 2 + rel_err_diam ** 2)
@@ -434,10 +444,10 @@ with rasterio.open(raster_path) as src:
 
         ### CREATING TOPOGRAPHIC PROFILES
 
-                            profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
+                            # profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
 
         ### TRI ALGORITHM
-                            TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
+                            # TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
 
         ### SETTING UP DATA FOR FUTURE SHAPEFILE CREATION
                             angle = 0
