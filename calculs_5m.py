@@ -34,7 +34,7 @@ from Topographical_profiles import profils_topo
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
-zone = '2'
+zone = '7'
 
 if zone in ['2', '3', '4']:
     pixel_size_tb = 2
@@ -137,7 +137,6 @@ if os.path.exists("results/RG" + zone + "/TRI"):
         shutil.rmtree("results/RG" + zone + "/TRI")
     except OSError as e:
         print(f"Error: {e.strerror}")
-
 
 # Open raster file
 with rasterio.open(raster_path) as src:
@@ -306,7 +305,7 @@ with rasterio.open(raster_path) as src:
                     circularity = Miller_index(min_pos, max_coord_relative, pixel_size_tb)
                     circularity = round(circularity, 2)
 
-                    if 0.99 <= circularity <= 1:
+                    if 0.95 <= circularity <= 1:
 
         ### SLOPE
 
@@ -531,6 +530,7 @@ with rasterio.open(raster_path) as src:
                                                   'run_id': id,
                                                   'NAC_DTM_ID': nac_id})
 
+                            angle = 0
                             for i in range(len(max_geom)):
 
                                 highest_points.append({'geometry': max_geom[i],

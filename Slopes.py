@@ -38,23 +38,39 @@ def max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size_tb):
     return np.max(slopes)
 
 def slopes_calculation(min_pos, min_value, max_value, max_coord_relative, pixel_size_tb, precision_error):
+    min_pos = list(min_pos)
+    min_pos.remove(0)
     slopes = []
     delta_slopes = []
 
     for point in range(len(max_value)):
         dist = distance_calculation(min_pos, max_coord_relative[point], pixel_size_tb)
 
-        diff_alt = round(max_value[point] - min_value)
+        diff_alt = max_value[point] - min_value
 
-        slope_rad = round(np.arctan(diff_alt / dist), 4)
+        slope_rad = np.arctan(diff_alt / dist)
+
+
 
         slope_deg = round(np.rad2deg(slope_rad), 4)
 
+        if slope_deg >50 :
+            print(min_pos, max_coord_relative[point])
+            print(slope_rad)
+            print(diff_alt / dist)
+            print(slope_deg, max_value[point], min_value, dist, diff_alt)
+
         slopes.append(slope_deg)
 
-        delta_slope = np.sqrt(
-            2 * (precision_error/(max_coord_relative[point][0]-min_pos[0]))**2
-            + 2 * (((max_coord_relative[point][1] - min_pos[1]) * pixel_size_tb)/((max_coord_relative[point][0]-min_pos[0])**2))**2
+        x = min_pos[0] - max_coord_relative[point][0]
+        y = min_pos[1] - max_coord_relative[point][0]
+        z = min_value - max_value[point]
+
+
+        delta_slope = (1 / (1 + (z / dist)**2) ) * np.sqrt(
+            ((z * x / dist**3) * np.sqrt(2) * pixel_size_tb)**2
+            + ((z * y / dist**3) * np.sqrt(2) * pixel_size_tb)
+            + (np.sqrt(2) * precision_error / dist)**2
         )
 
         delta_slopes.append(delta_slope)

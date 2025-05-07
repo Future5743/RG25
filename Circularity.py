@@ -36,6 +36,9 @@ def Miller_index(min_pos, max_coord_relative, pixel_size_tb):
     perimeter = 0
     area = 0
 
+    min_pos = list(min_pos)
+    min_pos.remove(0)
+
     for i in range(len(max_coord_relative) - 1):
         # Calcul de distance pour le perimetre et la formule de Heron
         da = distance_calculation(max_coord_relative[i], max_coord_relative[i + 1], pixel_size_tb)

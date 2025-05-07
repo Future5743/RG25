@@ -13,7 +13,9 @@ from shapely.geometry import Point, LineString
 ######################################################################################################################################################################################
 ######################################################################################## CODE ########################################################################################
 ######################################################################################################################################################################################
-def Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value, max_coord_relative, max_coord_real, max_geom, line_geom, profils, demi_profils_coords_relatives):
+
+def Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value, max_coord_relative, max_coord_real,
+                   max_geom, line_geom, profils, demi_profils_coords_relatives):
 
     lowest_point_coord = None
     min_geom = None
@@ -155,7 +157,7 @@ def horizontal_270(min_pos, masked_image, no_data_value, out_transform):
 
         return max_val_left, point_haut_horiz_270
 
-def vertical_360 (min_pos, masked_image, no_data_value, out_transform):
+def vertical_360(min_pos, masked_image, no_data_value, out_transform):
     # Trouver les valeurs des colonnes en haut de la position minimale dans la même colonne
     col_top_index = min_pos[2]  # Index de la colonne où se trouve l'altitude la plus basse
     col_top = masked_image[0, :min_pos[1] + 1,
@@ -185,7 +187,7 @@ def vertical_360 (min_pos, masked_image, no_data_value, out_transform):
 
         return max_val_top, point_haut_vert_360
 
-def vertical_180 (min_pos, masked_image, no_data_value, out_transform):
+def vertical_180(min_pos, masked_image, no_data_value, out_transform):
     # Trouver les valeurs des lignes en dessous de la position minimale dans la même colonne
     col_bas_index = min_pos[2]  # Index de la colonne où se trouve l'altitude la plus basse
     col_bas = masked_image[0, min_pos[1]:,
