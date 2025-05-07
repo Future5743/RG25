@@ -1,6 +1,6 @@
 # RG25
 
-## Explanation of tree structure and files
+## Explanation of the folder structure and files
 
 ### Folders
 📁 data -- This folder contains all the data needed to launch python scripts  

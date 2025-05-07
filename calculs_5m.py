@@ -6,8 +6,6 @@
 
 import geopandas as gpd    # Import of the “Geopandas” python library. Allows you to manipulate geographic data
 
-import skimage as sk
-
 import os
 
 import shutil
@@ -18,7 +16,7 @@ from rasterio.mask import mask
 
 import numpy as np
 
-from shapely.geometry import Point, LineString, Polygon
+from shapely.geometry import Point, Polygon
 
 from tqdm import tqdm
 
@@ -52,7 +50,7 @@ if zone in ['2', '3', '4']:
 else:
     pixel_size_tb = 5
 
-    if zone == '1' :
+    if zone == '1':
         precision_error = 5.1
 
     if zone == '5':
@@ -131,14 +129,14 @@ if os.path.exists("results/RG" + zone + "/profils"):
     try:
         shutil.rmtree("results/RG" + zone + "/profils")
     except OSError as e:
-        print(f"Error:{e.strerror}")
+        print(f"Error: {e.strerror}")
 
 
 if os.path.exists("results/RG" + zone + "/TRI"):
     try:
         shutil.rmtree("results/RG" + zone + "/TRI")
     except OSError as e:
-        print(f"Error:{e.strerror}")
+        print(f"Error: {e.strerror}")
 
 
 # Open raster file
@@ -314,8 +312,6 @@ with rasterio.open(raster_path) as src:
 
                         max_slope_crater = max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size_tb)
 
-                        slopes, delta_slopes = slopes_calculation(min_pos, min_val, max_value, max_coord_relative, pixel_size_tb, precision_error)
-
                         if max_slope_crater < 8:
 
                             '''
@@ -375,7 +371,7 @@ with rasterio.open(raster_path) as src:
 
                     # AVERAGE CRATER DEPTH
 
-                            profondeurs = max_value - min_val
+                            profondeurs = [x - min_val for x in max_value]
 
                             sigma = np.sqrt(precision_error**2 + np.std(profondeurs)**2)
 
@@ -475,10 +471,14 @@ with rasterio.open(raster_path) as src:
 
         ### CREATING TOPOGRAPHIC PROFILES
 
-                            # profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
+                            profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
 
         ### TRI ALGORITHM
-                            # TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
+                            TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
+
+        ### SLOPES CALCULATION
+                            slopes, delta_slopes = slopes_calculation(min_pos, min_val, max_value, max_coord_relative,
+                                                                      pixel_size_tb, precision_error)
 
         ### SETTING UP DATA FOR FUTURE SHAPEFILE CREATION
                             angle = 0
