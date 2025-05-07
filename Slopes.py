@@ -36,3 +36,28 @@ def max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size_tb):
         slopes.append(slope_deg)
 
     return np.max(slopes)
+
+def slopes_calculation(min_pos, min_value, max_value, max_coord_relative, pixel_size_tb, precision_error):
+    slopes = []
+    delta_slopes = []
+
+    for point in range(len(max_value)):
+        dist = distance_calculation(min_pos, max_coord_relative[point], pixel_size_tb)
+
+        diff_alt = round(max_value[point] - min_value)
+
+        slope_rad = round(np.arctan(diff_alt / dist), 4)
+
+        slope_deg = round(np.rad2deg(slope_rad), 4)
+
+        slopes.append(slope_deg)
+
+        delta_slope = np.sqrt(
+            2 * (precision_error/(max_coord_relative[point][0]-min_pos[0]))**2
+            + 2 * (((max_coord_relative[point][1] - min_pos[1]) * pixel_size_tb)/((max_coord_relative[point][0]-min_pos[0])**2))**2
+        )
+
+        delta_slopes.append(delta_slope)
+
+    return slopes, delta_slopes
+

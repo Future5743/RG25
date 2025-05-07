@@ -26,7 +26,7 @@ from Maximum_search import Finding_maxima, horizontal_90, horizontal_270, vertic
 
 from Circularity import Miller_index
 
-from Slopes import max_crater_slopes_calculation
+from Slopes import max_crater_slopes_calculation, slopes_calculation
 
 from TRI import TRI
 
@@ -253,14 +253,20 @@ with rasterio.open(raster_path) as src:
 
                 D = np.array(D)
 
-                delta_D = np.sqrt(np.std(D)**2 + (pixel_size_tb * np.sqrt(2))**2)
+                # Uncertainity of a diameter
+                delta_D_stopar = np.sqrt(np.std(D)**2 + (pixel_size_tb * np.sqrt(2))**2)    # Stopar et al., 2017
+
+                delta_D_hoover = np.sqrt(np.std(D)**2 + pixel_size_tb**2)                   # Hoover et al., 2024
 
                 # Average diameters
                 moy_diam = round(np.mean(D), 2)
 
                 # Uncertainty of average
                 N = len(D)
-                incertitude_moy_diam = round(delta_D / np.sqrt(N), 2)           # Stopar et al., 2017
+                delta_Dbarre_stopar = round(delta_D_stopar / np.sqrt(N), 2)           # Stopar et al., 2017
+
+                delta_Dbarre_hoover = round(delta_D_hoover / np.sqrt(N), 2)           # Hoover et al., 2024
+
 
         # Calculation of the radius of the average diameter
                 ray_largest_diam = round(moy_diam / 2, 1)
@@ -307,6 +313,8 @@ with rasterio.open(raster_path) as src:
         ### SLOPE
 
                         max_slope_crater = max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size_tb)
+
+                        slopes, delta_slopes = slopes_calculation(min_pos, min_val, max_value, max_coord_relative, pixel_size_tb, precision_error)
 
                         if max_slope_crater < 8:
 
@@ -369,22 +377,31 @@ with rasterio.open(raster_path) as src:
 
                             profondeurs = max_value - min_val
 
-                            N = len(profondeurs) + 1
-
                             sigma = np.sqrt(precision_error**2 + np.std(profondeurs)**2)
 
                             prof_moyen_crat = round(np.mean(profondeurs), 3)
 
-                            delta_prof = sigma / np.sqrt(N)         # Hoover et al., 2024
+                            delta_d_stopar = np.sqrt(2) * precision_error / np.sqrt(N)      # Stopar et al., 2017
+
+                            delta_d_hoover = sigma / np.sqrt(N + 1)                         # Hoover et al., 2024
 
                     # d/D CALCULATION
 
                             ratio_dD = round(prof_moyen_crat / moy_diam, 3)
 
-                            rel_err_prof = delta_prof / prof_moyen_crat
-                            rel_err_diam = incertitude_moy_diam / moy_diam
-                            rel_err_ratio = np.sqrt(rel_err_prof ** 2 + rel_err_diam ** 2)
-                            delta_dD = round(rel_err_ratio * ratio_dD, 4)
+                            # Uncertainities calculations
+
+                            ## Stopar et al., 2017
+                            rel_err_prof_stopar = delta_d_stopar / prof_moyen_crat
+                            rel_err_diam_stopar = delta_Dbarre_stopar / moy_diam
+                            rel_err_ratio_stopar = np.sqrt(rel_err_prof_stopar ** 2 + rel_err_diam_stopar ** 2)
+                            delta_dD_stopar = round(rel_err_ratio_stopar * ratio_dD, 4)
+
+                            ## Hoover et al., 2024
+                            rel_err_prof_hoover = delta_d_hoover / prof_moyen_crat
+                            rel_err_diam_hoover = delta_D_hoover / moy_diam
+                            rel_err_ratio_hoover = np.sqrt(rel_err_prof_hoover ** 2 + rel_err_diam_hoover ** 2)
+                            delta_dD_hoover = round(rel_err_ratio_hoover * ratio_dD, 4)
 
                     # Ajouter les informations de Pente à la liste results_pente
                     #         results_pente.append({'run_ID': id,
@@ -458,18 +475,20 @@ with rasterio.open(raster_path) as src:
 
         ### CREATING TOPOGRAPHIC PROFILES
 
-                            profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
+                            # profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
 
         ### TRI ALGORITHM
-                            TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
+                            # TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
 
         ### SETTING UP DATA FOR FUTURE SHAPEFILE CREATION
                             angle = 0
 
-                            for line in line_geom:
-                                Lignes_visualisation.append(({'geometry': line,
-                                                              'position': str(angle),
+                            for line in range(len(line_geom)):
+                                Lignes_visualisation.append(({'geometry': line_geom[line],
                                                               'run_id': id,
+                                                              'position': str(angle),
+                                                              'slope': slopes[line],
+                                                              'δ_slope': delta_slopes[line],
                                                               'NAC_DTM_ID': nac_id}))
                                 angle += 10
 
@@ -491,11 +510,14 @@ with rasterio.open(raster_path) as src:
                                                             'center_lat': center_y_dl,
                                                             'ray_maxdia': ray_largest_diam,
                                                             'moyen_diam': int(moy_diam),
-                                                            'incer_D': incertitude_moy_diam,
+                                                            'δ_D_stop': delta_Dbarre_stopar,
+                                                            'δ_D_hoov': delta_D_hoover,
                                                             'prof_moyen': round(prof_moyen_crat, 1),
-                                                            'incer_de': delta_prof,
+                                                            'δ_d_stop': delta_d_stopar,
+                                                            'δ_d_hoov': delta_d_hoover,
                                                             'ratio_dD': ratio_dD,
-                                                            'incer_dD': delta_dD,
+                                                            'δ_dD_stop': delta_dD_stopar,
+                                                            'δ_dD_hoov': delta_dD_hoover,
                                                             'circularit': circularity,
                                                             'pente_rim': max_slope_crater,
                                                             'swirl': swirl_on_or_off,
