@@ -3,6 +3,11 @@
 ######################################################################################################################################################################################
 
 import numpy as np
+from sklearn.decomposition import PCA
+import rasterio
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
 
 ######################################################################################################################################################################################
 ######################################################################################## CODE ########################################################################################
@@ -36,6 +41,8 @@ def max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size_tb):
         slopes.append(slope_deg)
 
     return np.max(slopes)
+
+
 
 def slopes_calculation(min_pos, min_value, max_value, max_coord_relative, pixel_size_tb, precision_error):
     min_pos = list(min_pos)
@@ -76,4 +83,80 @@ def slopes_calculation(min_pos, min_value, max_value, max_coord_relative, pixel_
         delta_slopes.append(delta_slope)
 
     return slopes, delta_slopes
+
+
+def slope_calculation_by_PCA(profils, demi_profils_coords_relatives, index_maximum, out_transform, visualize=False):
+    slopes_PCA = []
+
+    for i in range(len(profils)):
+        points = []
+
+        profils[i] = profils[i][: index_maximum[i]]
+        demi_profils_coords_relatives[i][0] = demi_profils_coords_relatives[i][0][: index_maximum[i]]
+        demi_profils_coords_relatives[i][1] = demi_profils_coords_relatives[i][1][: index_maximum[i]]
+
+        for j in range(len(profils[i])):
+            x, y = rasterio.transform.xy(
+                out_transform,
+                demi_profils_coords_relatives[i][0][j],
+                demi_profils_coords_relatives[i][1][j]
+            )
+            points.append([x, y, profils[i][j]])
+
+        points = np.array(points)
+        points = points[~np.isnan(points).any(axis=1)]
+
+        # Centre des points
+        mean_point = points.mean(axis=0)
+
+        # ACP
+        pca = PCA(n_components=1)
+        pca.fit(points - mean_point)
+
+        direction = pca.components_[0]
+
+        # Calcul de la pente par projection 2D (Z / sqrt(X² + Y²))
+        horizontal_norm = np.linalg.norm(direction[:2])
+        if horizontal_norm == 0:
+            pente_deg = 0
+        else:
+            pente_proj = direction[2] / horizontal_norm
+            pente_deg = np.rad2deg(np.arctan(pente_proj))
+
+        pente_deg = abs(pente_deg)  # toujours positive
+        print(pente_deg)
+
+        slopes_PCA.append(pente_deg)
+
+        if pente_deg > 20:
+            visualize = True
+            print(visualize)
+
+        # Visualisation du profil + droite ACP
+        if visualize:  # juste pour le premier profil
+            fig = plt.figure(figsize=(10, 6))
+            ax = fig.add_subplot(111, projection='3d')
+            ax.scatter(points[:, 0], points[:, 1], points[:, 2], color='blue', label='Profil')
+
+            # Droite ACP
+            line_length = 10
+            line_pts = np.array([
+                mean_point - direction * line_length,
+                mean_point + direction * line_length
+            ])
+            ax.plot(line_pts[:, 0], line_pts[:, 1], line_pts[:, 2], color='red', label='Droite ACP', linewidth=2)
+
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('Altitude')
+            ax.set_title(f'Profil {i} avec direction principale (Pente: {pente_deg:.2f}°)')
+            ax.legend()
+            plt.tight_layout()
+            plt.show()
+
+    return slopes_PCA
+
+
+
+
 

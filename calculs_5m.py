@@ -24,7 +24,7 @@ from Maximum_search import Finding_maxima, horizontal_90, horizontal_270, vertic
 
 from Circularity import Miller_index
 
-from Slopes import max_crater_slopes_calculation, slopes_calculation
+from Slopes import max_crater_slopes_calculation, slopes_calculation, slope_calculation_by_PCA
 
 from TRI import TRI
 
@@ -206,10 +206,11 @@ with rasterio.open(raster_path) as src:
             line_geom = []                      # Stores the line geometries of the profiles studied
             profils = []                        # Stores topographic profiles
             demi_profils_coords_relatives = []  # Stores the relative coordinates of points in the profile
+            index_maximum = []
 
             lowest_point_coord, min_geom = Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value,
                                                           max_coord_relative, max_coord_real, max_geom, line_geom,
-                                                          profils, demi_profils_coords_relatives)
+                                                          profils, demi_profils_coords_relatives, index_maximum)
 
             if len(max_geom) == 36:
 
@@ -470,14 +471,17 @@ with rasterio.open(raster_path) as src:
 
         ### CREATING TOPOGRAPHIC PROFILES
 
-                            profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
+                            # profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
 
         ### TRI ALGORITHM
-                            TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
+                            # TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
 
         ### SLOPES CALCULATION
                             slopes, delta_slopes = slopes_calculation(min_pos, min_val, max_value, max_coord_relative,
                                                                       pixel_size_tb, precision_error)
+
+                            print(min_geom)
+                            slopes_PCA = slope_calculation_by_PCA(profils, demi_profils_coords_relatives, index_maximum, out_transform)
 
         ### SETTING UP DATA FOR FUTURE SHAPEFILE CREATION
                             angle = 0
@@ -487,6 +491,7 @@ with rasterio.open(raster_path) as src:
                                                               'run_id': id,
                                                               'position': str(angle),
                                                               'slope': slopes[line],
+                                                              'slopesPCA': slopes_PCA[line],
                                                               'δ_slope': delta_slopes[line],
                                                               'NAC_DTM_ID': nac_id}))
                                 angle += 10
