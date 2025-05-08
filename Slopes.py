@@ -124,7 +124,6 @@ def slope_calculation_by_PCA(profils, demi_profils_coords_relatives, index_maxim
             pente_deg = np.rad2deg(np.arctan(pente_proj))
 
         pente_deg = abs(pente_deg)  # toujours positive
-        print(pente_deg)
 
         slopes_PCA.append(pente_deg)
 

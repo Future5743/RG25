@@ -34,7 +34,7 @@ from Topographical_profiles import profils_topo
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
-zone = '2'
+zone = '7'
 
 if zone in ['2', '3', '4']:
     pixel_size_tb = 2
@@ -471,10 +471,10 @@ with rasterio.open(raster_path) as src:
 
         ### CREATING TOPOGRAPHIC PROFILES
 
-                            # profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
+                            profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
 
         ### TRI ALGORITHM
-                            # TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
+                            TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
 
         ### SLOPES CALCULATION
                             slopes, delta_slopes = slopes_calculation(min_pos, min_val, max_value, max_coord_relative,
