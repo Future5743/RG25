@@ -34,7 +34,7 @@ from Topographical_profiles import profils_topo
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
-zone = '7'
+zone = '2'
 
 if zone in ['2', '3', '4']:
     pixel_size_tb = 2
@@ -480,7 +480,6 @@ with rasterio.open(raster_path) as src:
                             slopes, delta_slopes = slopes_calculation(min_pos, min_val, max_value, max_coord_relative,
                                                                       pixel_size_tb, precision_error)
 
-                            print(min_geom)
                             slopes_PCA = slope_calculation_by_PCA(profils, demi_profils_coords_relatives, index_maximum, out_transform)
 
         ### SETTING UP DATA FOR FUTURE SHAPEFILE CREATION

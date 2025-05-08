@@ -127,9 +127,10 @@ def slope_calculation_by_PCA(profils, demi_profils_coords_relatives, index_maxim
 
         slopes_PCA.append(pente_deg)
 
+        '''
         if pente_deg > 20:
             visualize = True
-            print(visualize)
+        '''
 
         # Visualisation du profil + droite ACP
         if visualize:  # juste pour le premier profil
