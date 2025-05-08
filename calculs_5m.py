@@ -34,7 +34,7 @@ from Topographical_profiles import profils_topo
 #################################################################################### DATA OPENING ####################################################################################
 ######################################################################################################################################################################################
 
-zone = '7'
+zone = '2'
 
 if zone in ['2', '3', '4']:
     pixel_size_tb = 2
@@ -305,7 +305,7 @@ with rasterio.open(raster_path) as src:
                     circularity = Miller_index(min_pos, max_coord_relative, pixel_size_tb)
                     circularity = round(circularity, 2)
 
-                    if 0.95 <= circularity <= 1:
+                    if 0.97 <= circularity <= 1:
 
         ### SLOPE
 
