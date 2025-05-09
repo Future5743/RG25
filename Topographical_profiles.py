@@ -1,6 +1,6 @@
-######################################################################################################################################################################################
-#################################################################################### IMPORTATIONS ####################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+##################################################### IMPORTATIONS #####################################################
+########################################################################################################################
 
 import matplotlib.pyplot as plt
 
@@ -10,29 +10,29 @@ import math
 
 import numpy as np
 
-######################################################################################################################################################################################
-######################################################################################## CODE ########################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+######################################################### CODE #########################################################
+########################################################################################################################
 
-def calcul_distance(pos1, pos2, pixel_size_tb=2):
+def calcul_distance(pos1, pos2, pixel_size_tb):
     pixel_dist_tb = np.sqrt((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2)
 
     distance_in_meters_tb = pixel_dist_tb * pixel_size_tb
 
     return distance_in_meters_tb
 
-def profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off) :
+def profils_topo(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off) :
     all_profiles = []
     min_X = [0] * 1000  # Trouver une variable plus exacte que 1000
 
     ### Creation des 18 profils du cratere
-    for i in range(int(len(profils) / 2)):
+    for i in range(int(len(demi_profils_value) / 2)):
 
         X = []
 
-        demi_profil = profils[i + 18]
+        demi_profil = demi_profils_value[i + 18]
 
-        reversed_demi_profil = list(reversed(profils[i]))[:-1]
+        reversed_demi_profil = list(reversed(demi_profils_value[i]))[:-1]
 
         limit_profil = len(reversed_demi_profil)
 
@@ -47,7 +47,8 @@ def profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone
 
         for pixel in range(len(profils_coords_relatives_rr)):
             dist = calcul_distance([profils_coords_relatives_rr[0], profils_coords_relatives_cc[0]],
-                                   [profils_coords_relatives_rr[pixel], profils_coords_relatives_cc[pixel]], pixel_size_tb)
+                                   [profils_coords_relatives_rr[pixel], profils_coords_relatives_cc[pixel]],
+                                   pixel_size_tb)
             X.append(dist)
 
         if len(X) < len(min_X):
@@ -65,20 +66,20 @@ def profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone
         plt.plot(X, profil, marker='x')
         plt.xlabel("Distance (m)")
         plt.ylabel("Altitude")
-        plt.title("Profil topographique pour les angles " + str(i * 10) + " et " + str((i + 18) * 10))
+        plt.title(f'Profil topographique pour les angles {i * 10} et {(i + 18) * 10}')
         plt.grid(True)
 
         # Gestion des dossiers
         if swirl_on_or_off == 'on-swirl':
-            path = "results/RG" + zone + "/profils/on_swirl/" + str(id)
+            path = f'results/RG{zone}/profils/on_swirl/{id}'
             if not os.path.exists(path):
                 os.makedirs(path)
         else:
-            path = "results/RG" + zone + "/profils/off_swirl/" + str(id)
+            path = f'results/RG{zone}/profils/off_swirl/{id}'
             if not os.path.exists(path):
                 os.makedirs(path)
 
-        plt.savefig(path + "/Profil_" + str(i * 10) + "_" + str((i + 18) * 10) + ".png")
+        plt.savefig(path + f'/Profil_{i * 10}_{(i + 18) * 10}.png')
         plt.close()
 
     ### Adaptation des profils pour le moyennage futur

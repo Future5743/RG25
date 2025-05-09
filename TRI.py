@@ -1,6 +1,6 @@
-######################################################################################################################################################################################
-#################################################################################### IMPORTATIONS ####################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+##################################################### IMPORTATIONS #####################################################
+########################################################################################################################
 import matplotlib.pyplot as plt
 
 import os
@@ -19,9 +19,9 @@ from shapely.geometry import Polygon
 
 from shapely.geometry.polygon import orient
 
-######################################################################################################################################################################################
-#################################################################################### LIST CREATION ###################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+######################################################### CODE #########################################################
+########################################################################################################################
 def draw_TRI(TRI, id, zone):
     fig, ax = plt.subplots()
 
@@ -30,12 +30,12 @@ def draw_TRI(TRI, id, zone):
 
     # Ajouter une barre de couleur
     fig.colorbar(cax)
-    plt.title("Indice TRI sur le cratère " + str(id) + " de la zone RG" + zone)
+    plt.title(f'Indice TRI sur le cratère {id} de la zone RG{zone}')
 
-    if not os.path.exists("results/RG" + zone + "/TRI"):
-        os.makedirs("results/RG" + zone + "/TRI")
+    if not os.path.exists(f'results/RG{zone}/TRI'):
+        os.makedirs(f'results/RG{zone}/TRI')
 
-    plt.savefig("results/RG" + zone + "/TRI/TRI_" + str(id) + ".png")
+    plt.savefig(f'results/RG{zone}/TRI/TRI_{id}.png')
     plt.close()
 
 
@@ -45,7 +45,7 @@ def array_to_GeoTIF(TRI, coord_left_down, pixel_size_tb, id, zone, crs):
     transform = from_origin(upper_left_x, upper_left_y, pixel_size_tb, pixel_size_tb)
 
     with rasterio.open(
-            'results/RG' + zone + '/TRI/TRI_' + str(id) + '.tif',
+            f'results/RG{zone}/TRI/TRI_{id}.tif',
             'w',
             driver='GTiff',
             height=TRI.shape[0],
@@ -57,7 +57,7 @@ def array_to_GeoTIF(TRI, coord_left_down, pixel_size_tb, id, zone, crs):
     ) as dst:
         dst.write(TRI, 1)
 
-def TRI (center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, crs) :
+def TRI (center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, crs):
     coord1 = [center_x_dl - ray, center_y_dl - ray]
     coord2 = [center_x_dl + ray, center_y_dl - ray]
     coord3 = [center_x_dl + ray, center_y_dl + ray]

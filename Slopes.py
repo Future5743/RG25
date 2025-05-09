@@ -1,6 +1,6 @@
-######################################################################################################################################################################################
-#################################################################################### IMPORTATIONS ####################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+##################################################### IMPORTATIONS #####################################################
+########################################################################################################################
 
 import numpy as np
 from sklearn.decomposition import PCA
@@ -9,9 +9,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 
-######################################################################################################################################################################################
-######################################################################################## CODE ########################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+######################################################### CODE #########################################################
+########################################################################################################################
 def distance_calculation(pos1, pos2, pixel_size_tb=2):
     pixel_dist_tb = np.sqrt((pos1[0] - pos2[0]) ** 2 + (pos1[1] - pos2[1]) ** 2)
 
@@ -57,26 +57,17 @@ def slopes_calculation(min_pos, min_value, max_value, max_coord_relative, pixel_
 
         slope_rad = np.arctan(diff_alt / dist)
 
-
-
         slope_deg = round(np.rad2deg(slope_rad), 4)
 
-        if slope_deg >50 :
-            print(min_pos, max_coord_relative[point])
-            print(slope_rad)
-            print(diff_alt / dist)
-            print(slope_deg, max_value[point], min_value, dist, diff_alt)
-
-        slopes.append(slope_deg)
+        slopes.append(round(slope_deg, 2))
 
         x = min_pos[0] - max_coord_relative[point][0]
         y = min_pos[1] - max_coord_relative[point][0]
         z = min_value - max_value[point]
 
-
-        delta_slope = (1 / (1 + (z / dist)**2) ) * np.sqrt(
+        delta_slope = (1 / (1 + (z / dist)**2)) * np.sqrt(
             ((z * x / dist**3) * np.sqrt(2) * pixel_size_tb)**2
-            + ((z * y / dist**3) * np.sqrt(2) * pixel_size_tb)
+            + ((z * y / dist**3) * np.sqrt(2) * pixel_size_tb)**2
             + (np.sqrt(2) * precision_error / dist)**2
         )
 
@@ -86,6 +77,7 @@ def slopes_calculation(min_pos, min_value, max_value, max_coord_relative, pixel_
 
 
 def slope_calculation_by_PCA(profils, demi_profils_coords_relatives, index_maximum, out_transform, visualize=False):
+
     slopes_PCA = []
 
     for i in range(len(profils)):
@@ -115,6 +107,9 @@ def slope_calculation_by_PCA(profils, demi_profils_coords_relatives, index_maxim
 
         direction = pca.components_[0]
 
+        print(pca.get_covariance())
+        print(pca.get_precision())
+
         # Calcul de la pente par projection 2D (Z / sqrt(X² + Y²))
         horizontal_norm = np.linalg.norm(direction[:2])
         if horizontal_norm == 0:
@@ -123,9 +118,9 @@ def slope_calculation_by_PCA(profils, demi_profils_coords_relatives, index_maxim
             pente_proj = direction[2] / horizontal_norm
             pente_deg = np.rad2deg(np.arctan(pente_proj))
 
-        pente_deg = abs(pente_deg)  # toujours positive
+        pente_deg = abs(pente_deg)  # Toujours positive
 
-        slopes_PCA.append(pente_deg)
+        slopes_PCA.append(round(pente_deg, 2))
 
         '''
         if pente_deg > 20:
@@ -149,7 +144,7 @@ def slope_calculation_by_PCA(profils, demi_profils_coords_relatives, index_maxim
             ax.set_xlabel('X')
             ax.set_ylabel('Y')
             ax.set_zlabel('Altitude')
-            ax.set_title(f'Profil {i} avec direction principale (Pente: {pente_deg:.2f}°)')
+            ax.set_title(f'Profil {i} avec direction principale (Pente: {pente_deg: .2f}°)')
             ax.legend()
             plt.tight_layout()
             plt.show()

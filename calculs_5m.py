@@ -1,8 +1,8 @@
 # 11/04/2025. Code en cours de mise à jour.
 
-######################################################################################################################################################################################
-#################################################################################### IMPORTATIONS ####################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+##################################################### IMPORTATIONS #####################################################
+########################################################################################################################
 
 import geopandas as gpd    # Import of the “Geopandas” python library. Allows you to manipulate geographic data
 
@@ -30,11 +30,11 @@ from TRI import TRI
 
 from Topographical_profiles import profils_topo
 
-######################################################################################################################################################################################
-#################################################################################### DATA OPENING ####################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+##################################################### DATA OPENING #####################################################
+########################################################################################################################
 
-zone = '2'
+zone = '7'
 
 if zone in ['2', '3', '4']:
     pixel_size_tb = 2
@@ -84,9 +84,9 @@ swirls_geom = swirls['geometry']
 hiesinger_geom = hiesinger['geometry']
 hiesinger_age = hiesinger['Model_Age']
 
-######################################################################################################################################################################################
-#################################################################################### LIST CREATION ###################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+##################################################### LIST CREATION ####################################################
+########################################################################################################################
 
 # POINT geometry
 highest_points = []             # Stores the geometry of the highest points corresponding to the crater crest
@@ -99,7 +99,7 @@ centers = []                    # Stores the geometry of the centers of each val
 
 # LINESTRING geometry
 
-Lignes_visualisation = []       # Stores line geometry for viewing each profile
+Lines_visualisation = []       # Stores line geometry for viewing each profile
 
 # POLYGON geometry
 
@@ -108,10 +108,10 @@ rim_approx = []                 # Stores the geometry resulting from the polygon
 rim_approx_smooth = []          # Stores the smoothed geometry resulting from the polygon formed by the highest_points
 
 # List to store information about the slope between opposite edges of a crater
-results_pente = []
+results_slopes = []
 
 # List to store information about a crater's circularity for all selected craters
-results_circularite = []
+results_circularity = []
 
 # Geometry of final craters
 result_geom_select_crat = []
@@ -122,9 +122,9 @@ results_ratio_dD = []
 # Force full display of a numpy array
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 
-######################################################################################################################################################################################
-######################################################################################## CODE ########################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+######################################################### CODE #########################################################
+########################################################################################################################
 if os.path.exists("results/RG" + zone + "/profils"):
     try:
         shutil.rmtree("results/RG" + zone + "/profils")
@@ -204,13 +204,14 @@ with rasterio.open(raster_path) as src:
             max_coord_real = []                 # Stores the actual coordinates of the highest_points
             max_geom = []                       # Stores geometries of highest_points
             line_geom = []                      # Stores the line geometries of the profiles studied
-            profils = []                        # Stores topographic profiles
+            demi_profils_value = []             # Stores topographic profiles
             demi_profils_coords_relatives = []  # Stores the relative coordinates of points in the profile
             index_maximum = []
 
             lowest_point_coord, min_geom = Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value,
                                                           max_coord_relative, max_coord_real, max_geom, line_geom,
-                                                          profils, demi_profils_coords_relatives, index_maximum)
+                                                          demi_profils_value, demi_profils_coords_relatives,
+                                                          index_maximum)
 
             if len(max_geom) == 36:
 
@@ -234,7 +235,7 @@ with rasterio.open(raster_path) as src:
                 D = []
 
                 # Calculation of different diameter values
-                def calcul_distance(pos1, pos2, pixel_size_tb=2):
+                def calcul_distance(pos1, pos2, pixel_size_tb):
 
                     pixel_dist_tb = np.sqrt((pos1[0]-pos2[0])**2 + (pos1[1]-pos2[1])**2)
 
@@ -251,19 +252,19 @@ with rasterio.open(raster_path) as src:
 
                 D = np.array(D)
 
-                # Uncertainity of a diameter
-                delta_D_stopar = np.sqrt(np.std(D)**2 + (pixel_size_tb * np.sqrt(2))**2)    # Stopar et al., 2017
-
-                delta_D_hoover = np.sqrt(np.std(D)**2 + pixel_size_tb**2)                   # Hoover et al., 2024
-
                 # Average diameters
                 moy_diam = round(np.mean(D), 2)
 
+                # Uncertainity of a diameter
+                delta_D_stopar = np.sqrt(2) * pixel_size_tb                                 # Stopar et al., 2017
+
+                delta_D_hoover = np.sqrt(np.std(D)**2 + pixel_size_tb**2)                   # Hoover et al., 2024
+
                 # Uncertainty of average
                 N = len(D)
-                delta_Dbarre_stopar = round(delta_D_stopar / np.sqrt(N), 2)           # Stopar et al., 2017
+                delta_Dbarre_stopar = round(delta_D_stopar / np.sqrt(N), 2)                 # Stopar et al., 2017
 
-                delta_Dbarre_hoover = round(delta_D_hoover / np.sqrt(N), 2)           # Hoover et al., 2024
+                delta_Dbarre_hoover = round(delta_D_hoover / np.sqrt(N), 2)                 # Hoover et al., 2024
 
 
         # Calculation of the radius of the average diameter
@@ -274,7 +275,8 @@ with rasterio.open(raster_path) as src:
 
                     '''
                 # Profil vertical
-                    # Calcul de la distance euclidienne en pixels entre max_pos_bas et max_pos_top et la convertir en mètres
+                    # Calcul de la distance euclidienne en pixels entre max_pos_bas et max_pos_top 
+                    # et la convertir en mètres
                     def calculate_pixel_distance_tb(pos1tb, pos2tb, pixel_size_tb=5):
     
                         # Calculer la distance euclidienne en pixels
@@ -288,7 +290,8 @@ with rasterio.open(raster_path) as src:
                     distance_bas_top = calculate_pixel_distance_tb(max_pos_bas, max_pos_top)
     
                 # Profil horizontal
-                    # Calcul de la distance euclidienne en pixels entre max_pos_right et max_pos_left et la convertir en mètres
+                    # Calcul de la distance euclidienne en pixels entre max_pos_right et max_pos_left 
+                    # et la convertir en mètres
                     def calculate_pixel_distance_lr(pos1lr, pos2lr, pixel_size_lr=5):
     
                         # Calculer la distance euclidienne en pixels
@@ -316,7 +319,8 @@ with rasterio.open(raster_path) as src:
 
                             '''
                         # Profil Horizontal
-                            # Trouver la plus basse altitude et la plus haute altitude entre celle de l'Est et celle de l'Ouest
+                            # Trouver la plus basse altitude et la plus haute altitude entre celle de l'Est 
+                            # et celle de l'Ouest
                             petite_altitude = min(max_val_right, max_val_left)
                             grande_altitude = max(max_val_right, max_val_left)
         
@@ -330,7 +334,8 @@ with rasterio.open(raster_path) as src:
                             slope_degrees_eo = round(np.degrees(slope_radians), 4)
         
                         # Profil Vertical
-                            # Trouver la plus basse altitude et la plus haute altitude entre celle du Nord et celle du Sud
+                            # Trouver la plus basse altitude et la plus haute altitude entre celle du Nord 
+                            # et celle du Sud
                             petite_altitude_ns = min(max_val_top, max_val_bas)
                             grande_altitude_ns = max(max_val_top, max_val_bas)
         
@@ -353,13 +358,15 @@ with rasterio.open(raster_path) as src:
                                 buffer_poly = center.buffer(radius, resolution=num_points)
                                 return buffer_poly
 
-                            buf_diam_max = buffer_diam_max(lowest_point_coord[0], lowest_point_coord[1], ray_largest_diam)
+                            buf_diam_max = buffer_diam_max(lowest_point_coord[0], lowest_point_coord[1],
+                                                           ray_largest_diam)
 
                         # # DISTANCE MIN_VAL AVEC CHACUN DES POINTS HAUTS E,O,N,S
                         #     def pixel_distance_centre_haut(pos1ch, pos2ch, pixel_size_ch=2):
                         #
                         #         # Calculer la distance euclidienne en pixels
-                        #         pixel_distance_ch = np.sqrt((pos2ch[0] - pos1ch[0]) ** 2 + (pos2ch[1] - pos1ch[1]) ** 2)
+                        #         pixel_distance_ch = np.sqrt((pos2ch[0] - pos1ch[0]) ** 2
+                            #         + (pos2ch[1] - pos1ch[1]) ** 2)
                         #
                         #         # Conversion de la distance euclidienne en mètres
                         #         distance_in_meters_ch = pixel_distance_ch * pixel_size_ch
@@ -367,18 +374,18 @@ with rasterio.open(raster_path) as src:
                         #
                         #     # Conversion de la distance euclidienne en mètres
                         #     distance_centre_haut = pixel_distance_centre_haut(lowest_points[0], highest_points[0])
-                        #     print(f"Distance entre le point haut au Nord et le point bas au centre : {distance_centre_haut} mètres", id)
+                        #     print(f"Distance entre le point haut au Nord et le point bas au centre :
+                        #           {distance_centre_haut} mètres", id)
 
                     # AVERAGE CRATER DEPTH
 
-                            profondeurs = [x - min_val for x in max_value]
+                            depth = [x - min_val for x in max_value]
 
-                            sigma = np.sqrt(precision_error**2 + np.std(profondeurs)**2)
-
-                            prof_moyen_crat = round(np.mean(profondeurs), 3)
+                            prof_moyen_crat = round(np.mean(depth), 3)
 
                             delta_d_stopar = np.sqrt(2) * precision_error / np.sqrt(N)      # Stopar et al., 2017
 
+                            sigma = np.sqrt(precision_error ** 2 + np.std(depth) ** 2)
                             delta_d_hoover = sigma / np.sqrt(N + 1)                         # Hoover et al., 2024
 
                     # d/D CALCULATION
@@ -399,8 +406,8 @@ with rasterio.open(raster_path) as src:
                             rel_err_ratio_hoover = np.sqrt(rel_err_prof_hoover ** 2 + rel_err_diam_hoover ** 2)
                             delta_dD_hoover = round(rel_err_ratio_hoover * ratio_dD, 4)
 
-                    # Ajouter les informations de Pente à la liste results_pente
-                    #         results_pente.append({'run_ID': id,
+                    # Ajouter les informations de Pente à la liste results_slopes
+                    #         results_slopes.append({'run_ID': id,
                     #                               'Altitude_PHN': round(max_val_top, 3),
                     #                               'Altitude_PHE': round(max_val_right, 3),
                     #                               'Altitude_PHS': round(max_val_bas, 3),
@@ -420,8 +427,8 @@ with rasterio.open(raster_path) as src:
                     #                               'degres_pente_PHE_PHO': round(slope_degrees_eo, 2)
                     #                                })
 
-                        # Ajouter les informations de Circularité à la liste results_circularite
-                        #     results_circularite.append({'run_ID': id,
+                        # Ajouter les informations de Circularité à la liste results_circularity
+                        #     results_circularity.append({'run_ID': id,
                         #                                 'Diametre_PHS_PHN': distance_bas_top,
                         #                                 'Diametre_PHE_PHO': distance_right_left,
                         #                                 'Moyenne_diametre': moy_diam,
@@ -440,7 +447,8 @@ with rasterio.open(raster_path) as src:
                             def bezier_curve(p0, p1, p2, n=20) :
                                 t = np.linspace(0,1,n)
 
-                                return (1-t)[:, None]**2 * p0 + 2 * (1-t)[:, None] * t[:, None] * p1 + t[:, None]**2 * p2
+                                return (1-t)[:, None]**2 * p0 + 2 * (1-t)[:, None] * t[:, None] * p1 
+                                        + t[:, None]**2 * p2
 
                             def smooth_polygon_with_bezier (poly: Polygon, n=20) :
                                 if not poly.is_valid:
@@ -471,7 +479,8 @@ with rasterio.open(raster_path) as src:
 
         ### CREATING TOPOGRAPHIC PROFILES
 
-                            profils_topo(profils, demi_profils_coords_relatives, pixel_size_tb, id, zone, swirl_on_or_off)
+                            profils_topo(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, id, zone,
+                                         swirl_on_or_off)
 
         ### TRI ALGORITHM
                             TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, craters.crs)
@@ -480,19 +489,28 @@ with rasterio.open(raster_path) as src:
                             slopes, delta_slopes = slopes_calculation(min_pos, min_val, max_value, max_coord_relative,
                                                                       pixel_size_tb, precision_error)
 
-                            slopes_PCA = slope_calculation_by_PCA(profils, demi_profils_coords_relatives, index_maximum, out_transform)
+                            slopes_PCA = slope_calculation_by_PCA(demi_profils_value, demi_profils_coords_relatives,
+                                                                  index_maximum, out_transform)
 
         ### SETTING UP DATA FOR FUTURE SHAPEFILE CREATION
                             angle = 0
 
-                            for line in range(len(line_geom)):
-                                Lignes_visualisation.append(({'geometry': line_geom[line],
+                            for i in range(len(line_geom)):
+                                Lines_visualisation.append(({'geometry': line_geom[i],
                                                               'run_id': id,
-                                                              'position': str(angle),
-                                                              'slope': slopes[line],
-                                                              'slopesPCA': slopes_PCA[line],
-                                                              'δ_slope': delta_slopes[line],
+                                                              'position': f'Ligne à {angle}°',
+                                                              'slope': slopes[i],
+                                                              'slopesPCA': slopes_PCA[i],
+                                                              'δ_slope': delta_slopes[i],
                                                               'NAC_DTM_ID': nac_id}))
+
+                                highest_points.append({'geometry': max_geom[i],
+                                                       'long': max_coord_real[i][0],
+                                                       'lat': max_coord_real[i][1],
+                                                       'max_alt': round(max_value[i], 1),
+                                                       'position': f'Point à {angle}°',
+                                                       'run_id': id,
+                                                       'NAC_DTM_ID': nac_id})
                                 angle += 10
 
                             centers.append(({'geometry': coord_center_geom,
@@ -500,11 +518,18 @@ with rasterio.open(raster_path) as src:
                                              'center_lon': center_x_dl,
                                              'center_lat': center_y_dl}))
 
+                            lowest_points.append({'geometry': min_geom,
+                                                  'alt': round(min_val, 1),
+                                                  'position': lowest_point_coord,
+                                                  'run_id': id,
+                                                  'NAC_DTM_ID': nac_id})
+
                             rim_approx.append(({'geometry': rim_approx_geom,
                                                 'run_id': id,
                                                 'NAC_DTM_ID': nac_id}))
 
-                            # rim_approx_smooth.append(({'geometry': rim_approx_smooth_geom, 'run_id': id, 'NAC_DTM_ID': nac_id}))
+                            # rim_approx_smooth.append(({'geometry': rim_approx_smooth_geom, 'run_id': id,
+                            # 'NAC_DTM_ID': nac_id}))
 
                             result_geom_select_crat.append({'run_id': id,
                                                             'nac_dtm_id': nac_id,
@@ -528,25 +553,6 @@ with rasterio.open(raster_path) as src:
 
                             # Create a Point object
 
-                            lowest_points.append({'geometry': min_geom,
-                                                  'alt': round(min_val, 1),
-                                                  'position': lowest_point_coord,
-                                                  'run_id': id,
-                                                  'NAC_DTM_ID': nac_id})
-
-                            angle = 0
-                            for i in range(len(max_geom)):
-
-                                highest_points.append({'geometry': max_geom[i],
-                                                       'long': max_coord_real[i][0],
-                                                       'lat': max_coord_real[i][1],
-                                                       'max_alt': round(max_value[i], 1),
-                                                       'position': "point à" + str(angle) + '°',
-                                                       'run_id': id,
-                                                       'NAC_DTM_ID': nac_id})
-
-                                angle += 10
-
                             profil_90.append({ 'geometry': point_haut_vert_360,    'max_alt': round(max_val_top, 1),
                                                'position': "point haut",   'run_id': id, 'NAC_DTM_ID': nac_id})
                             profil_90.append({ 'geometry': point_haut_vert_180,    'max_alt': round(max_val_bas, 1),
@@ -556,62 +562,63 @@ with rasterio.open(raster_path) as src:
                             profil_90.append({ 'geometry': point_haut_horiz_90,    'max_alt': round(max_val_right, 1),
                                                'position': "point droite", 'run_id': id, 'NAC_DTM_ID': nac_id})
 
-
-######################################################################################################################################################################################
-#################################################################################### RESULTS DATA ####################################################################################
-######################################################################################################################################################################################
+########################################################################################################################
+##################################################### RESULTS DATA #####################################################
+########################################################################################################################
 
 # Creating final files
 
-# Create a GeoDataFrame with the GPS coordinates of circles meeting all crater selection criteria for the d/D ratio study
+# Create a GeoDataFrame with the GPS coordinates of circles meeting all crater selection criteria
+# for the d/D ratio study
 gdf = gpd.GeoDataFrame(result_geom_select_crat, crs=craters.crs)
 # Save GeoDataFrame in Shapefile format
-shapefile_path = 'results/RG' + zone + '/results_geom_08_40m_RG' + zone + '_v2.shp'
+shapefile_path = f'results/RG{zone}/results_geom_08_40m_RG{zone}_v2.shp'
 gdf.to_file(shapefile_path)
 
 # Create a GeoDataFrame with the GPS coordinates of the low points
 gdf_haut_rg = gpd.GeoDataFrame(lowest_points, crs=craters.crs)
 # Save GeoDataFrame in Shapefile format
-shapefile_path = 'results/RG' + zone + '/results_geom_bas_RG' + zone + '.shp'
+shapefile_path = f'results/RG{zone}/results_geom_bas_RG{zone}.shp'
 gdf_haut_rg.to_file(shapefile_path)
 
 # Create a GeoDataFrame with GPS coordinates of high points
 gdf_max = gpd.GeoDataFrame(highest_points, crs=craters.crs)
 # Save GeoDataFrame in Shapefile format
-shapefile_path = 'results/RG' + zone + '/results_geom_max_RG' + zone + '.shp'
+shapefile_path = f'results/RG{zone}/results_geom_max_RG{zone}.shp'
 gdf_max.to_file(shapefile_path)
 
 # Create a GeoDataFrame with GPS coordinates of high points every 90°
 gdf_max_90 = gpd.GeoDataFrame(profil_90, crs=craters.crs)
 # Save GeoDataFrame in Shapefile format
-shapefile_path = 'results/RG' + zone + '/results_geom_90_RG' + zone + '.shp'
+shapefile_path = f'results/RG{zone}/results_geom_90_RG{zone}.shp'
 gdf_max_90.to_file(shapefile_path)
 
 # Pente en CSV
-# Convertir la liste results_pente en DataFrame pandas
-# df_pente = pd.DataFrame(results_pente)
+# Convertir la liste results_slopes en DataFrame pandas
+# df_pente = pd.DataFrame(results_slopes)
 # Sauvegarder le DataFrame dans un fichier CSV
-# df_pente.to_csv('C:/Users/calg2564/PycharmProjects/pythonProject/rg2-3-4_MNT5m/results_pente_rg2.csv', index=False)
+# df_pente.to_csv('C:/Users/calg2564/PycharmProjects/pythonProject/rg2-3-4_MNT5m/results_slopes_rg2.csv', index=False)
 
 # Circularité en CSV
-# Convertir la liste results_circularite en DataFrame pandas
-# df_circu = pd.DataFrame(results_circularite)
+# Convertir la liste results_circularity en DataFrame pandas
+# df_circu = pd.DataFrame(results_circularity)
 # Sauvegarder le DataFrame dans un fichier CSV
-# df_circu.to_csv('C:/Users/calg2564/PycharmProjects/pythonProject/rg2-3-4_MNT5m/results_circularite_rg2.csv', index=False)
+# df_circu.to_csv('C:/Users/calg2564/PycharmProjects/pythonProject/rg2-3-4_MNT5m/results_circularity_rg2.csv',
+# index=False)
 
-gdf_line = gpd.GeoDataFrame(Lignes_visualisation, crs=craters.crs)
+gdf_line = gpd.GeoDataFrame(Lines_visualisation, crs=craters.crs)
 # Save GeoDataFrame in Shapefile format
-shapefile_path = 'results/RG' + zone + '/results_geom_line_RG' + zone + '.shp'
+shapefile_path = f'results/RG{zone}/results_geom_line_RG{zone}.shp'
 gdf_line.to_file(shapefile_path)
 
 gdf_centers = gpd.GeoDataFrame(centers, crs=craters.crs)
 # Save GeoDataFrame in Shapefile format
-shapefile_path = 'results/RG' + zone + '/results_geom_centers_RG' + zone + '.shp'
+shapefile_path = f'results/RG{zone}/results_geom_centers_RG{zone}.shp'
 gdf_centers.to_file(shapefile_path)
 
 gdf_rim = gpd.GeoDataFrame(rim_approx, crs=craters.crs)
 # Save GeoDataFrame in Shapefile format
-shapefile_path = 'results/RG' + zone + '/results_geom_rim_RG' + zone + '.shp'
+shapefile_path = f'results/RG{zone}/results_geom_rim_RG{zone}.shp'
 gdf_rim.to_file(shapefile_path)
 
 '''
