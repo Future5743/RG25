@@ -1,48 +1,60 @@
 ########################################################################################################################
 ##################################################### IMPORTATIONS #####################################################
 ########################################################################################################################
-import matplotlib.pyplot as plt
-
 import os
-
-import rasterio
-
-from rasterio.crs import CRS
-
-from rasterio.mask import mask
-
-from rasterio.transform import from_origin
-
 import numpy as np
-
+import matplotlib.pyplot as plt
+import rasterio
+from rasterio.mask import mask
+from rasterio.transform import from_origin
 from shapely.geometry import Polygon
-
-from shapely.geometry.polygon import orient
+from scipy.ndimage import generic_filter
 
 ########################################################################################################################
 ######################################################### CODE #########################################################
 ########################################################################################################################
 def draw_TRI(TRI, id, zone):
-    fig, ax = plt.subplots()
+    '''
+    This function draw and save the TRI index as a color image.
 
-    # Afficher les données avec la colormap viridis inversée
-    cax = ax.imshow(TRI, cmap='viridis_r', vmin=-0.25, vmax=0.25)
+    Entries:
+        TRI: array          -- Contains the values of the TRI for the studied crater
+        id: int             -- ID of the studied crater
+        zone: str           -- Indicate the crater's zone of study (can be 1, 2, 3, 4, 5, 6 or 7)
 
-    # Ajouter une barre de couleur
-    fig.colorbar(cax)
+    Exit data:
+        no exit data
+    '''
+
+    os.makedirs(f'results/RG{zone}/TRI', exist_ok=True)
+
+    plt.figure()
+    cax = plt.imshow(TRI, cmap='viridis_r', vmin=-0.25, vmax=0.25)
+    plt.colorbar(cax)
     plt.title(f'Indice TRI sur le cratère {id} de la zone RG{zone}')
-
-    if not os.path.exists(f'results/RG{zone}/TRI'):
-        os.makedirs(f'results/RG{zone}/TRI')
-
     plt.savefig(f'results/RG{zone}/TRI/TRI_{id}.png')
     plt.close()
 
 
-def array_to_GeoTIF(TRI, coord_left_down, pixel_size_tb, id, zone, crs):
-    upper_left_x, upper_left_y = coord_left_down
 
-    transform = from_origin(upper_left_x, upper_left_y, pixel_size_tb, pixel_size_tb)
+def array_to_GeoTIF(TRI, coord_left_down, pixel_size_tb, id, zone, crs):
+    '''
+    This function export the TRI array as a GeoTIFF.
+
+    Entries:
+        TRI: array                      -- Contains the values of the TRI for the studied crater
+        coord_left_down: list           -- Coordinate of the pixel that is at the bottom left of the TRI matrix
+        pixel_size_tb: int              -- Size of the pixel on the terrain
+        id: int                         -- ID of the studied crater
+        zone: str                       -- Indicate the crater's zone of study (can be 1, 2, 3, 4, 5, 6 or 7)
+        crs: str                        -- Is the crs of teh studied area
+
+    Exit data:
+        no exit data
+    '''
+
+    transform = from_origin(coord_left_down[0], coord_left_down[1] + pixel_size_tb * TRI.shape[0], pixel_size_tb,
+                            pixel_size_tb)
 
     with rasterio.open(
             f'results/RG{zone}/TRI/TRI_{id}.tif',
@@ -57,58 +69,52 @@ def array_to_GeoTIF(TRI, coord_left_down, pixel_size_tb, id, zone, crs):
     ) as dst:
         dst.write(TRI, 1)
 
-def TRI (center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, crs):
-    coord1 = [center_x_dl - ray, center_y_dl - ray]
-    coord2 = [center_x_dl + ray, center_y_dl - ray]
-    coord3 = [center_x_dl + ray, center_y_dl + ray]
-    coord4 = [center_x_dl - ray, center_y_dl + ray]
 
-    emporte_piece = [Polygon([coord1, coord2, coord3, coord4, coord1])]
 
-    # Découper le raster en utilisant le polygone
-    out_image, out_transform = mask(src, emporte_piece, crop=True)
+def compute_TRI_array(image, no_data_value):
+    """Compute the TRI array using mean and std of the 8-neighbor window."""
+    # Mask no-data
+    image = np.where(image == no_data_value, np.nan, image)
 
-    # Ignorer les valeurs "no data"
-    masked_image_square = np.ma.masked_equal(out_image, no_data_value)
+    # Define function to compute TRI value at each pixel
+    def tri_func(window):
+        center = window[4]
+        neighbors = np.delete(window, 4)
+        mean_val = np.nanmean(neighbors)
+        std_val = np.nanstd(neighbors)
+        if np.isnan(center) or np.isnan(mean_val) or std_val == 0:
+            return 0
+        return (center - mean_val) / std_val
 
-    DTM_mean = []
-    DTM_range = []
+    # Apply generic filter (3x3 window, flattened)
+    return generic_filter(image[0], tri_func, size=3, mode='constant', cval=np.nan)
 
-    for y in range(1, masked_image_square.shape[1] - 1):
 
-        row_mean = []
-        row_range = []
 
-        for x in range(1, masked_image_square.shape[2] - 1):
-            window = [masked_image_square[:, y + 1, x - 1],
-                      masked_image_square[:, y + 1, x],
-                      masked_image_square[:, y + 1, x + 1],
-                      masked_image_square[:, y, x - 1],
-                      masked_image_square[:, y, x + 1],
-                      masked_image_square[:, y - 1, x - 1],
-                      masked_image_square[:, y - 1, x],
-                      masked_image_square[:, y - 1, x + 1]]
+def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, crs):
+    """Main function to compute TRI index for a crater area."""
+    # Define square polygon around center
+    half_size = ray
+    coords = [
+        [center_x_dl - half_size, center_y_dl - half_size],
+        [center_x_dl + half_size, center_y_dl - half_size],
+        [center_x_dl + half_size, center_y_dl + half_size],
+        [center_x_dl - half_size, center_y_dl + half_size]
+    ]
+    polygon = [Polygon(coords)]
 
-            row_mean.append(np.mean(window))
+    # Clip raster using the polygon
+    out_image, out_transform = mask(src, polygon, crop=True)
 
-            row_range.append(np.std(window))
+    # Compute TRI
+    TRI_array = compute_TRI_array(out_image, no_data_value)
 
-        DTM_mean.append(row_mean)
-        DTM_range.append(row_range)
+    # Clean borders and remove all-zeros rows/cols
+    TRI_array = np.nan_to_num(TRI_array, nan=0.0)
+    TRI_array = TRI_array[~np.all(TRI_array == 0, axis=1)]
+    TRI_array = TRI_array[:, ~np.all(TRI_array == 0, axis=0)]
 
-    DTM_mean = np.array(DTM_mean)
-
-    DTM_range = np.array(DTM_range)
-
-    TRI = np.round((masked_image_square[0][1:-1, 1:-1] - DTM_mean) / DTM_range, decimals=3)
-
-    index = np.where(np.isnan(TRI) != False)
-    TRI[index] = 0
-
-    TRI = TRI[~np.all(TRI == 0, axis=1)]
-    TRI = TRI[:, ~np.all(TRI == 0, axis=0)]
-
-    draw_TRI(TRI, id, zone)
-
-    array_to_GeoTIF(TRI, coord4, pixel_size_tb, id, zone, crs)
+    # Save outputs
+    draw_TRI(TRI_array, id, zone)
+    array_to_GeoTIF(TRI_array, coords[0], pixel_size_tb, id, zone, crs)
 

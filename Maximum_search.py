@@ -17,6 +17,29 @@ from shapely.geometry import Point, LineString
 def Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value, max_coord_relative, max_coord_real,
                    max_geom, line_geom, demi_profils_value, demi_profils_coords_relatives, index_maximum):
 
+    '''
+    This function find the maxima of the crater each 10°
+
+    Entries :
+        min_pos: tuple                          -- Relative coordinates of the crater's lowest point
+        min_val: float                          -- Elevation of the crater's lowest point
+        D: float                                -- Two times the len of the masked image
+        masked_image: ???                       -- ??
+        out_transform:???                       -- ??
+        max_value: list                         -- Contains all the elevations of the maxima on the rim
+        max_coord_relative: list                -- Contains all the relative coordinates of the maxima on the rim
+        max_coord_real: list                    -- Contains all the real coordinates of the maxima on the rim
+        max_geom: list                          -- Contains all the geometries of highest_points
+        line_geom: list                         -- Contains all the line geometries of the profiles studied
+        demi_profils_value: list                -- Contains th elevation value of each poin on the semi-profiles
+        demi_profils_coords_relatives: list     -- Contains the relative coordinates of each point on the semi-profiles
+        index_maximum: list                     -- Contains the index of the maximum point of each semi-profiles
+
+    Exit data :
+        lowest_point_coord: tupple              -- Real coordinates of the lowest point
+        min_geom: Point object                  -- Geometru of the lowest point
+    '''
+
     lowest_point_coord = None
     min_geom = None
 
@@ -101,8 +124,10 @@ def Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value, 
     return lowest_point_coord, min_geom
 
 
+
 def horizontal_90(min_pos, masked_image, no_data_value, out_transform):
-    # Pour la ligne de pixels extraite, trouver les valeurs des colonnes à droite de la position minimale dans la même ligne
+    # Pour la ligne de pixels extraite, trouver les valeurs des colonnes à droite de la position minimale dans la même
+    # ligne
     # Index de la ligne où se trouve l'altitude la plus basse
     row_index = min_pos[1]
     # Extraction de la ligne à partir de la position min_pos vers la droite
@@ -128,9 +153,12 @@ def horizontal_90(min_pos, masked_image, no_data_value, out_transform):
         point_haut_horiz_90 = Point(max_x_rg, max_y_rg)
 
         # Ajouter le point avec l'altitude la plus basse à la liste
-        # highest_points.append({'geometry': point_haut_horiz_90, 'max_altitude_right': max_val_right, 'run_id': id, 'NAC_DTM_ID': nac_id})
+        # highest_points.append({'geometry': point_haut_horiz_90, 'max_altitude_right': max_val_right, 'run_id': id,
+        # 'NAC_DTM_ID': nac_id})
 
         return max_val_right, point_haut_horiz_90
+
+
 
 def horizontal_270(min_pos, masked_image, no_data_value, out_transform):
     row_index = min_pos[1]
@@ -159,6 +187,8 @@ def horizontal_270(min_pos, masked_image, no_data_value, out_transform):
 
         return max_val_left, point_haut_horiz_270
 
+
+
 def vertical_360(min_pos, masked_image, no_data_value, out_transform):
     # Trouver les valeurs des colonnes en haut de la position minimale dans la même colonne
     col_top_index = min_pos[2]  # Index de la colonne où se trouve l'altitude la plus basse
@@ -185,9 +215,12 @@ def vertical_360(min_pos, masked_image, no_data_value, out_transform):
         point_haut_vert_360 = Point(max_x_top, max_y_top)
 
         # Ajouter le point avec l'altitude la plus basse à la liste
-        # highest_points.append({'geometry': point_haut_vert_360, 'max_altitude_right': max_val_top, 'run_id': id, 'NAC_DTM_ID': nac_id})
+        # highest_points.append({'geometry': point_haut_vert_360, 'max_altitude_right': max_val_top, 'run_id': id,
+        # 'NAC_DTM_ID': nac_id})
 
         return max_val_top, point_haut_vert_360
+
+
 
 def vertical_180(min_pos, masked_image, no_data_value, out_transform):
     # Trouver les valeurs des lignes en dessous de la position minimale dans la même colonne
