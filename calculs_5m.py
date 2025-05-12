@@ -12,11 +12,12 @@ from rasterio.mask import mask
 import numpy as np
 from shapely.geometry import Point, Polygon
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 from Maximum_search import Finding_maxima, horizontal_90, horizontal_270, vertical_360, vertical_180
 from Circularity import Miller_index
 from Slopes import max_crater_slopes_calculation, slopes_calculation, slope_calculation_by_PCA
 from TRI import TRI
-from Topographical_profiles import main
+from Topographical_profiles import main, visualisation3d
 
 ########################################################################################################################
 ##################################################### DATA OPENING #####################################################
@@ -463,6 +464,8 @@ with rasterio.open(raster_path) as src:
                                                                                 index_maximum, out_transform,
                                                                                 pixel_size_tb, precision_error,
                                                                                 n_simulations=100, visualize=False)
+
+                        # visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
 
                         # Commune attributes
                         common_attrs = {
