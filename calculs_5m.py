@@ -10,12 +10,12 @@ import shutil
 import rasterio
 from rasterio.mask import mask
 import numpy as np
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Point, Polygon, LineString
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from Maximum_search import Finding_maxima, horizontal_90, horizontal_270, vertical_360, vertical_180
 from Circularity import Miller_index
-from Slopes import max_crater_slopes_calculation, slopes_calculation, slope_calculation_by_PCA
+from Slopes import max_crater_slopes_calculation, slopes_calculation, slope_calculation_by_PCA, inner_slopes
 from TRI import TRI
 from Topographical_profiles import main, visualisation3d
 
@@ -75,6 +75,7 @@ centers = []                    # Stores the geometry of the centers of each val
 # LINESTRING geometry
 
 Lines_visualisation = []       # Stores line geometry for viewing each profile
+inner_slopes_results = []
 
 # POLYGON geometry
 
@@ -453,17 +454,27 @@ with rasterio.open(raster_path) as src:
                              zone, crater_id)
 
                         ### --- TRI ALGORITHM --- ###
-                        TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone, craters.crs)
+                        # TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone, craters.crs)
 
                         ### --- SLOPES CALCULATION --- ###
                         slopes, delta_slopes = slopes_calculation(min_pos, min_val, max_value, max_coord_relative,
                                                                   pixel_size_tb, precision_error)
 
-                        slopes_PCA, delta_slopes_PCA = slope_calculation_by_PCA(demi_profils_value,
-                                                                                demi_profils_coords_relatives,
-                                                                                index_maximum, out_transform,
-                                                                                pixel_size_tb, precision_error,
-                                                                                n_simulations=100, visualize=False)
+                        # slopes_PCA = slope_calculation_by_PCA(demi_profils_value, demi_profils_coords_relatives,
+                        #                                      index_maximum, out_transform,
+                        #                                      pixel_size_tb, precision_error,
+                        #                                      n_simulations=100, visualize=False)
+
+                        inner_slopes_deg, inner_slopes_delimitation = [], []
+
+                        inner_slopes(inner_slopes_deg,
+                                     inner_slopes_delimitation,
+                                     demi_profils_value,
+                                     demi_profils_coords_relatives,
+                                     zone,
+                                     crater_id,
+                                     swirl_on_or_off,
+                                     out_transform, index_maximum)
 
                         # visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
 
@@ -481,8 +492,7 @@ with rasterio.open(raster_path) as src:
                                 'position': f'Ligne à {angle}°',
                                 'slope': slopes[i],
                                 'δ_slope': delta_slopes[i],
-                                'slopesPCA': slopes_PCA[i],
-                                'δ_PCA': delta_slopes_PCA[i],
+                            #    'slopesPCA': slopes_PCA[i],
                                 **common_attrs
                             })
 
@@ -492,6 +502,17 @@ with rasterio.open(raster_path) as src:
                                 'lat': max_coord_real[i][1],
                                 'max_alt': round(max_value[i], 1),
                                 'position': f'Point à {angle}°',
+                                **common_attrs
+                            })
+
+                            point1 = list(inner_slopes_delimitation[i][0][:2])
+
+                            point2 = list(inner_slopes_delimitation[i][1][:2])
+
+                            inner_slopes_results.append({
+                                'geometry': LineString([point1, point2]),
+                                'position': f'Ligne à {angle}°',
+                                'slope': round(inner_slopes_deg[i], 2),
                                 **common_attrs
                             })
 
@@ -581,7 +602,8 @@ shapefile_data = [
     (profil_90,                f'results_geom_90_RG{zone}'),
     (Lines_visualisation,      f'results_geom_line_RG{zone}'),
     (centers,                  f'results_geom_centers_RG{zone}'),
-    (rim_approx,               f'results_geom_rim_RG{zone}')
+    (rim_approx,               f'results_geom_rim_RG{zone}'),
+    (inner_slopes_results,     f'results_geom_slopes_RG{zone}')
 ]
 
 # Création et export des GeoDataFrames

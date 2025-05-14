@@ -7,6 +7,7 @@ from sklearn.decomposition import PCA
 import rasterio
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import os
 
 ########################################################################################################################
 ######################################################### CODE #########################################################
@@ -158,7 +159,7 @@ def visualize_profile(points, slope, uncertainty, index):
         uncertainty: float     -- Uncertainty of the slope calculation with the PCA method
         index: int             -- id of the semi-profile
 
-    Exit data :
+    Exit data:
         no exit data
     '''
 
@@ -206,7 +207,7 @@ def slope_calculation_by_PCA(demi_profils_value, demi_profils_coords_relatives, 
         n_simulations: int                                 -- Number of wanted simulations
         visualize: bool                                    -- True if the user want to visualize the semi_profile
 
-    Exit data :
+    Exit data:
         slopes_PCA: list                                   -- Contains the slopes computed by PCA of each semi-profiles
         uncertainties: list                                -- Contains the uncertainties associates with the slopes of
                                                               each semi-profiles
@@ -232,15 +233,210 @@ def slope_calculation_by_PCA(demi_profils_value, demi_profils_coords_relatives, 
         points = points[~np.isnan(points).any(axis=1)]
 
         slope = compute_slope(points)
-        uncertainty = monte_carlo_uncertainty(points, n_simulations, pixel_size, dz)
+        # uncertainty = monte_carlo_uncertainty(points, n_simulations, pixel_size, dz)
 
         slopes_PCA.append(round(slope, 2))
-        uncertainties.append(uncertainty)
+        # uncertainties.append(uncertainty)
 
         if visualize:
             visualize_profile(points, slope, uncertainty, i)
 
-    return slopes_PCA, uncertainties
+    return slopes_PCA
+
+
+
+def smooth_profile(demi_profile, window_size=5):
+    '''
+    This function smooth the demi-profile using a moving average while ignoring NaN values.
+
+    Entries :
+        demi_profile: list              -- Contains the elevation data of the given demi-profile
+        window_size: int                -- The size of the window to smooth the profile
+
+    Exit data:
+        smoothed: list                  -- The elevation of the smoothed demi-profile
+    '''
+
+    demi_profile = np.array(demi_profile, dtype=np.float64)
+    smoothed = np.full_like(demi_profile, np.nan)
+
+    for i in range(len(demi_profile)):
+        start = max(i - window_size // 2, 0)
+        end = min(i + window_size // 2 + 1, len(demi_profile))
+        window = demi_profile[start:end]
+        valid = window[~np.isnan(window)]
+        if valid.size > 0:
+            smoothed[i] = np.mean(valid)
+
+    return smoothed
+
+
+
+def compute_steepest_slope_3d(coords, elevations, index_max, window=10):
+    '''
+    This function computes the steepest uphill slope segment in a 3D profile, ignoring the crater's lowest point
+
+    Entries:
+        coords: list                -- Contains the coordinates of each point of the given profile
+        elevations: list            -- Contains the elevation data of the given demi-profile
+        min_distance: int           -- The minimum size of the window to compute the inner slope
+
+    Exit data:
+        max_slope: float            -- The  value in degrees  slope of the inner slope
+        best_segment: list          -- The coordinates (long, lat, elevation) of the two points delimiting the inner
+                                       slope
+    '''
+
+    coords = np.array(coords)
+    elevations = np.array(elevations)
+
+    # Ignore first point (assumed lowest or undesired)
+    coords = coords[1:index_max]
+    elevations = elevations[1:index_max]
+
+    if len(coords) <= 1:
+        return None, None
+
+    window = min(window, len(coords) - 1)
+
+    window_max = min(int(0.9 * len(coords)), len(coords) - 1)
+
+    max_slope = -np.inf
+    best_segment = None
+
+    print(window, window_max)
+
+    if window < window_max:
+        for window_change in range(window, window_max):
+
+            for i in range(len(coords) - window_change):
+                z1, z2 = elevations[i], elevations[i + window_change]
+                if np.isnan([z1, z2]).any():
+                    continue
+
+                p1, p2 = coords[i], coords[i + window_change]
+                horiz_dist = np.linalg.norm(p2 - p1)
+                vert_dist = z2 - z1
+
+                slope_rad = np.arctan2(vert_dist, horiz_dist)
+                slope_deg = np.degrees(slope_rad)
+
+                if slope_deg > max_slope:
+                    max_slope = slope_deg
+                    best_segment = [(p1[0], p1[1], z1), (p2[0], p2[1], z2)]
+
+    if window >= window_max or best_segment is None:
+        for i in range(len(coords) - window):
+            z1, z2 = elevations[i], elevations[i + window]
+            if np.isnan([z1, z2]).any():
+                continue
+
+            p1, p2 = coords[i], coords[i + window]
+            horiz_dist = np.linalg.norm(p2 - p1)
+            vert_dist = z2 - z1
+
+            slope_rad = np.arctan2(vert_dist, horiz_dist)
+            slope_deg = np.degrees(slope_rad)
+
+            if slope_deg > max_slope:
+                max_slope = slope_deg
+                best_segment = [(p1[0], p1[1], z1), (p2[0], p2[1], z2)]
+
+    return max_slope, best_segment
+
+
+
+def save_smoothed_profile(smoothed, coords, index, zone, crater_id, swirl_status, index_max):
+    '''
+    This functiion save a 3D plot of the smoothed demi-profile with its steepest slope segment.
+
+    Entries:
+        smoothed: list                  -- The elevation of the smoothed demi-profile
+        coords: list                    -- Contains the reel coordinates of each demi-profiles
+        index: int                      -- Index of the studied demi-profile
+        zone: str                       -- Indicate the crater's zone of study (can be 1, 2, 3, 4, 5, 6 or 7)
+        crater_id: int                  -- ID of the studied crater
+        swirl_status: str               -- Indicate if the crater is on or off swirl
+
+    Exit data:
+        No exit data
+    '''
+
+    coords = np.array(coords)
+    smoothed = np.array(smoothed)
+
+    slope_deg, segment = compute_steepest_slope_3d(coords, smoothed, index_max)
+
+    fig = plt.figure(figsize=(20, 10))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot profile
+    ax.scatter(coords[:, 0], coords[:, 1], smoothed,
+               marker='x', color='orange', label='Profil lissé')
+
+    # Plot steepest segment
+    if segment:
+        seg = np.array(segment)
+        ax.plot(seg[:, 0], seg[:, 1], seg[:, 2],
+                color='blue', linewidth=4,
+                label=f'Slope ({slope_deg:.1f}°)')
+
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_zlabel("Altitude")
+    ax.set_title(f'Demi-profil {index * 10}°')
+    ax.legend()
+
+    # Save figure
+    subfolder = 'on_swirl' if swirl_status == 'on-swirl' else 'off_swirl'
+    path = os.path.join('results', f'RG{zone}', 'profils', subfolder, str(crater_id), 'inner_slope')
+    os.makedirs(path, exist_ok=True)
+    filename = f'Profil3D_demi_{index * 10}.png'
+    plt.savefig(os.path.join(path, filename))
+    plt.close()
+
+
+
+def inner_slopes(inner_slopes_deg, inner_slopes_delimitation, demi_profils_value, demi_profils_coords_relatives, zone,
+                 crater_id, swirl_on_or_off, out_transform, index_maximum):
+    '''
+    This function compute a crater's inner slopes, and save it.
+
+    Entries:
+        inner_slopes_deg: list                      -- Contains nothing. Is filled within the function
+                                                       Is meant to contain the value of the slope of each demi_profiles
+        inner_slopes_delimitation: list             -- Contains nothing. Is filled within the function
+                                                       Is meant to contain the delimitation of the inner slope of each
+                                                       demi-profile
+        demi_profils_value:list                     -- Contains the elevation value of each demi-profiles
+        demi_profils_coords_relatives: list         -- Contains the relative coordinates of each demi-profiles
+        zone: str                                   -- Indicate the crater's zone of study (can be 1, 2, 3, 4, 5, 6 or
+                                                       7)
+        crater_id: int                              -- ID of the studied crater
+        swirl_on_or_off: str                        -- Indicate if the crater is on or off swirl
+        out_transform: ???                          -- ???
+
+    Exit data:
+        No exit data
+    '''
+
+    for i, (values, (rows, cols)) in enumerate(zip(demi_profils_value, demi_profils_coords_relatives)):
+        # Convertir les indices en coordonnées réelles
+        demi_coords = [list(rasterio.transform.xy(out_transform, r, c)) for r, c in zip(rows, cols)]
+
+        # Lissage du profil
+        smoothed = smooth_profile(values, window_size=5)
+
+        # Calcul de la pente maximale
+        slope_deg, segment = compute_steepest_slope_3d(demi_coords, smoothed, index_maximum[i])
+
+        # Stockage des résultats
+        inner_slopes_deg.append(slope_deg)
+        inner_slopes_delimitation.append(segment)
+
+        # Sauvegarde du profil lissé et de la pente
+        save_smoothed_profile(smoothed, demi_coords, i, zone, crater_id, swirl_on_or_off, index_maximum[i])
+
 
 
 

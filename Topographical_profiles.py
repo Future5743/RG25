@@ -215,6 +215,156 @@ def save_average_profile(profil_moyen, min_X, path):
     plt.close()
 
 
+"""
+def smooth_profile(profile, window_size=5):
+    '''
+    Smooth the profile using a moving average while ignoring NaN values.
+
+    Entries:
+        profile: list or array      -- Original elevation profile (can contain NaN)
+        window_size: int            -- Size of the smoothing window (default 5)
+
+    Exit data:
+        smoothed_profile: list      -- Smoothed elevation profile
+    '''
+    profile = np.array(profile, dtype=np.float64)
+    smoothed_profile = np.full_like(profile, np.nan)
+
+    for i in range(len(profile)):
+        start = max(i - window_size // 2, 0)
+        end = min(i + window_size // 2 + 1, len(profile))
+        window = profile[start:end]
+        valid_values = window[~np.isnan(window)]
+        if valid_values.size > 0:
+            smoothed_profile[i] = np.mean(valid_values)
+
+    return smoothed_profile
+
+
+
+def save_smoothed_profile(smoothed_profile, X, i, zone, crater_id, swirl_on_or_off):
+    '''
+    Plot and save the smoothed profile image with inner slope segments highlighted.
+
+    Entries:
+        smoothed_profile: list      -- Smoothed elevation values
+        X: list                     -- Distances for the profile
+        i: int                      -- Profile index
+        zone: str                   -- Zone number
+        crater_id: int              -- Crater ID
+        swirl_on_or_off: str        -- Swirl status
+    '''
+
+    # Calcul des inner slopes
+    slope_info = compute_inner_slopes(X, smoothed_profile, window=10)
+
+    plt.figure(figsize=(40, 15))
+    plt.plot(X, smoothed_profile, marker='x', color='orange', label='Profil lissé')
+
+    # Ajout des segments de pente
+    if slope_info['left_segment']:
+        x_seg_left, y_seg_left = zip(*slope_info['left_segment'])
+        plt.plot(x_seg_left, y_seg_left, color='red', linewidth=4, label='Inner slope gauche')
+
+    if slope_info['right_segment']:
+        x_seg_right, y_seg_right = zip(*slope_info['right_segment'])
+        plt.plot(x_seg_right, y_seg_right, color='blue', linewidth=4, label='Inner slope droite')
+
+    plt.xlabel("Distance (m)")
+    plt.ylabel("Altitude (smoothed)")
+    plt.title(f'Profil lissé avec pentes internes {i * 10}° - {(i + 18) * 10}°')
+    plt.grid(True)
+    plt.legend()
+
+    # Chemin de sauvegarde
+    if swirl_on_or_off == 'on-swirl':
+        path = f'results/RG{zone}/profils/on_swirl/{crater_id}/smoothed'
+    else:
+        path = f'results/RG{zone}/profils/off_swirl/{crater_id}/smoothed'
+
+    save_path = os.path.join(path, f'Profil_lisse_{i * 10}_{(i + 18) * 10}.png')
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path)
+    plt.close()
+
+
+
+    def find_steepest_slope(x_vals, y_vals, side='left'):
+        max_slope = -np.inf
+        best_segment = None
+
+        # Modifier la taille de la fenêtre pour détecter des pentes plus grandes
+        for i in range(len(x_vals) - window):
+            x1, x2 = x_vals[i], x_vals[i + window]
+            y1, y2 = y_vals[i], y_vals[i + window]
+
+            if np.isnan([y1, y2]).any():
+                continue
+
+            delta_x = x2 - x1
+            delta_y = y2 - y1
+
+            # Calcul de la pente
+            slope_rad = np.arctan2(delta_y, delta_x)
+            slope_deg = np.degrees(slope_rad)
+
+            if side == 'left':
+                slope_deg = -slope_deg  # Pente descendante sur la gauche
+
+            # Mettre à jour la pente maximale
+            if slope_deg > max_slope:
+                max_slope = slope_deg
+                best_segment = [(x1, y1), (x2, y2)]
+
+        return max_slope, best_segment
+
+
+
+def compute_inner_slopes(X, smoothed_profile, window=10):
+    '''
+    Compute the steepest inner slopes (left and right) of a crater profile.
+
+    Entries:
+        X: list or array                -- Distances along the profile
+        smoothed_profile: list/array   -- Smoothed elevation profile
+        window: int                     -- Number of points for slope segments
+
+    Exit:
+        slopes_info: dict
+            {
+                'left_slope': float (in deg),
+                'right_slope': float (in deg),
+                'left_segment': [(x1, y1), (x2, y2)],
+                'right_segment': [(x3, y3), (x4, y4)]
+            }
+    '''
+    import numpy as np
+
+    X = np.array(X)
+    Y = np.array(smoothed_profile)
+
+    # 1. Trouver le fond du cratère (point le plus bas)
+    center_index = np.nanargmin(Y)
+
+    # 2. Séparer en deux (partie gauche et droite du cratère)
+    left_X, left_Y = X[:center_index], Y[:center_index]
+    right_X, right_Y = X[center_index:], Y[center_index:]
+
+    # 3. Trouver les pentes les plus raides (gauche et droite)
+    left_slope, left_segment = find_steepest_slope(left_X, left_Y, side='left')
+    right_slope, right_segment = find_steepest_slope(right_X, right_Y, side='right')
+
+    print(right_slope, right_segment)
+
+    return {
+        'left_slope_deg': left_slope,
+        'right_slope_deg': right_slope,
+        'left_segment': left_segment,
+        'right_segment': right_segment
+    }
+"""
+
+
 
 def main(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, swirl_on_or_off, zone, crater_id):
     '''
@@ -247,6 +397,12 @@ def main(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, swirl
         # Save and plot profile
         path = save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off)
 
+        # Smooth the profile
+        # smoothed_profile = smooth_profile(full_profile, window_size=5)
+
+        # Save and plot the smoothed profile
+        # save_smoothed_profile(smoothed_profile, X, i, zone, crater_id, swirl_on_or_off)
+
     # Adapt profiles for future averaging
     for profil_individuel in all_profiles:
         profil_individuel = adjust_profile_length(profil_individuel, min_X, limit_profil)
@@ -256,3 +412,32 @@ def main(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, swirl
 
     # Save and plot the average profile
     save_average_profile(profil_moyen, min_X, path=path)
+
+
+
+def visualisation3d (masked_image, crater_id, zone, swirl_on_or_off):
+    masked_band = masked_image[0]  # masked_image est de forme (1, rows, cols)
+
+    # Grille X, Y en fonction de la forme de l'image
+    rows, cols = masked_band.shape
+    X, Y = np.meshgrid(np.arange(cols), np.arange(rows))
+
+    # Affichage en 3D
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot_surface(X, Y, masked_band, cmap='terrain', linewidth=0, antialiased=False)
+
+    ax.set_title(f'Visualisation 3D du crater {crater_id} de RG{zone}')
+
+    if swirl_on_or_off == 'on-swirl':
+        path = f'results/RG{zone}/profils/on_swirl/{crater_id}'
+        save_path = os.path.join(path, f'Representation_3d_{crater_id}.png')
+    else:
+        path = f'results/RG{zone}/profils/off_swirl/{crater_id}'
+        save_path = os.path.join(path, f'Representation_3d_{crater_id}.png')
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    plt.savefig(save_path)
+    plt.show()
+    plt.close()
