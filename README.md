@@ -34,7 +34,7 @@ Here the one you specifically need to download :
 Here is an example of this data organization.
 
 📁 data\
-└──📁RG
+└──📁RG\
 │   ├──💾NAC_DTM_REINER1.tiff\
 │   ├──💾NAC_DTM_REINER2.tiff\
 │   ├──💾NAC_DTM_REINER3.tiff\
