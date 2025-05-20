@@ -40,7 +40,7 @@ Here is an example of this data organization.
 ├──💾NAC_DTM_REINER4.tiff\
 ├──💾NAC_DTM_REINER5.tiff\
 ├──💾NAC_DTM_REINER6.tiff\
-├──💾NAC_DTM_REINER7.tiff
+├──💾NAC_DTM_REINER7.tiff\
 📁 RG25 (This repository)\
 ├── 📁 data\
 ├── 📁 results\
