@@ -12,12 +12,12 @@ from rasterio.mask import mask
 import numpy as np
 from shapely.geometry import Point, Polygon, LineString
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 from Maximum_search import Finding_maxima, horizontal_90, horizontal_270, vertical_360, vertical_180
 from Circularity import Miller_index
 from Slopes import max_crater_slopes_calculation, slopes_calculation, slope_calculation_by_PCA, inner_slopes
 from TRI import TRI
 from Topographical_profiles import main, visualisation3d
+
 
 ########################################################################################################################
 ##################################################### DATA OPENING #####################################################
@@ -33,7 +33,8 @@ for zone in zones:
         '3': {'pixel_size_tb': 2, 'precision_error': 0.91},
         '4': {'pixel_size_tb': 2, 'precision_error': 0.87},
         '5': {'pixel_size_tb': 5, 'precision_error': 2.54},
-        '6': {'pixel_size_tb': 5, 'precision_error': 2.34}
+        '6': {'pixel_size_tb': 5, 'precision_error': 2.34},
+        '7': {'pixel_size_tb': 5, 'precision_error': 2.37}
     }
 
     # Valeurs par défaut si la zone n'est pas reconnue
@@ -46,7 +47,7 @@ for zone in zones:
 
     # Chemins vers les fichiers de données
     crater_shapefile_path = os.path.join('data', 'Buffer_crateres', f'Buffer_RG{zone}')
-    raster_path = os.path.join('..', 'data', 'DTM', f'NAC_DTM_REINER{zone}.tiff')
+    raster_path = os.path.join('..', 'data', 'RG', f'NAC_DTM_REINER{zone}.tiff')
     hiesinger_path = os.path.join('data', 'HIESINGER2011_MARE_AGE_UNITS_180', 'HIESINGER2011_MARE_AGE_UNITS_180.SHP')
     swirls_path = os.path.join('data', 'Swirl', 'REINER_GAMMA.shp')
 
@@ -86,6 +87,8 @@ for zone in zones:
 
     # List to store information about the slope between opposite edges of a crater
     results_slopes = []
+    results_slopes_20_80 = []
+    results_slopes_30_70 = []
 
     # List to store information about a crater's circularity for all selected craters
     results_circularity = []
@@ -419,29 +422,50 @@ for zone in zones:
                                  zone, crater_id)
 
                             ### --- TRI ALGORITHM --- ###
-                            TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone, craters.crs)
+                            TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
+                                craters.crs)
 
                             ### --- SLOPES CALCULATION --- ###
-                            slopes, delta_slopes = slopes_calculation(min_pos, min_val, max_value, max_coord_relative,
-                                                                      pixel_size_tb, precision_error)
+                            slopes_20, delta_slopes_20, mean_slope_20, geom_20 = slopes_calculation(demi_profils_value,
+                                                                                                    demi_profils_coords_relatives,
+                                                                                                    index_maximum,
+                                                                                                    pixel_size_tb,
+                                                                                                    precision_error,
+                                                                                                    out_transform,
+                                                                                                    no_data_value,
+                                                                                                    rate=0.2)
 
-                            slopes_PCA = slope_calculation_by_PCA(demi_profils_value, demi_profils_coords_relatives,
-                                                                  index_maximum, out_transform,
-                                                                  pixel_size_tb, precision_error,
-                                                                  n_simulations=100, visualize=False)
+                            slopes_30, delta_slopes_30, mean_slope_30, geom_30 = slopes_calculation(demi_profils_value,
+                                                                                                    demi_profils_coords_relatives,
+                                                                                                    index_maximum,
+                                                                                                    pixel_size_tb,
+                                                                                                    precision_error,
+                                                                                                    out_transform,
+                                                                                                    no_data_value,
+                                                                                                    rate=0.3)
+
+                            slopes_PCA, mean_slope_PCA, delta_PCA = slope_calculation_by_PCA(demi_profils_value,
+                                                                                             demi_profils_coords_relatives,
+                                                                                             index_maximum,
+                                                                                             out_transform,
+                                                                                             pixel_size_tb,
+                                                                                             precision_error,
+                                                                                             n_simulations=100,
+                                                                                             visualize=False)
+
 
                             inner_slopes_deg, inner_slopes_delimitation = [], []
 
-                            inner_slopes(inner_slopes_deg,
-                                         inner_slopes_delimitation,
-                                         demi_profils_value,
-                                         demi_profils_coords_relatives,
-                                         zone,
-                                         crater_id,
-                                         swirl_on_or_off,
-                                         out_transform, index_maximum)
+                            mean_inner_slope = inner_slopes(inner_slopes_deg,
+                                                            inner_slopes_delimitation,
+                                                            demi_profils_value,
+                                                            demi_profils_coords_relatives,
+                                                            zone, crater_id, swirl_on_or_off,
+                                                            out_transform, index_maximum,
+                                                            pixel_size_tb, precision_error)
 
-                            visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
+
+                            #visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
 
                             # Commune attributes
                             common_attrs = {
@@ -454,21 +478,22 @@ for zone in zones:
                             for i, geom in enumerate(line_geom):
                                 Lines_visualisation.append({
                                     'geometry': geom,
+                                    **common_attrs,
                                     'position': f'Ligne à {angle}°',
-                                    'slope': slopes[i],
-                                    'δ_slope': delta_slopes[i],
                                     'slopesPCA': slopes_PCA[i],
-                                    **common_attrs
+                                    'δ_PCA': delta_PCA[i],
+                                    'meanPCA': mean_slope_PCA
                                 })
 
                                 highest_points.append({
                                     'geometry': max_geom[i],
+                                    **common_attrs,
                                     'long': max_coord_real[i][0],
                                     'lat': max_coord_real[i][1],
                                     'max_alt': round(max_value[i], 1),
-                                    'position': f'Point à {angle}°',
-                                    **common_attrs
+                                    'position': f'Point à {angle}°'
                                 })
+
 
                                 point1 = list(inner_slopes_delimitation[i][0][:2])
 
@@ -476,9 +501,28 @@ for zone in zones:
 
                                 inner_slopes_results.append({
                                     'geometry': LineString([point1, point2]),
+                                    **common_attrs,
                                     'position': f'Ligne à {angle}°',
                                     'slope': round(inner_slopes_deg[i], 2),
-                                    **common_attrs
+                                    'meanSlope': mean_inner_slope,
+                                    # 'δ_slope': uncertainty_inner_slope[i]
+                                })
+
+
+                                results_slopes_20_80.append({
+                                    'geometry': geom_20[i],
+                                    **common_attrs,
+                                    'slope_20': slopes_20[i],
+                                    'δ_slope': delta_slopes_20[i],
+                                    'mean_': mean_slope_20
+                                })
+
+                                results_slopes_30_70.append({
+                                    'geometry': geom_30[i],
+                                    **common_attrs,
+                                    'slope_30': slopes_30[i],
+                                    'δ_slope': delta_slopes_30[i],
+                                    'mean': mean_slope_30
                                 })
 
                                 angle += 10
@@ -486,17 +530,17 @@ for zone in zones:
                             # Crater's center
                             centers.append({
                                 'geometry': coord_center_geom,
+                                **common_attrs,
                                 'center_lon': center_x,
-                                'center_lat': center_y,
-                                **common_attrs
+                                'center_lat': center_y
                             })
 
                             # Lowest point
                             lowest_points.append({
                                 'geometry': min_geom,
+                                **common_attrs,
                                 'alt': round(min_val, 1),
-                                'position': lowest_point_coord,
-                                **common_attrs
+                                'position': lowest_point_coord
                             })
 
                             # Approximative rim
@@ -508,6 +552,7 @@ for zone in zones:
                             # Crater's metadata
                             result_geom_select_crat.append({
                                 'geometry': buf_diam_max,
+                                **common_attrs,
                                 'center_lon': center_x,
                                 'center_lat': center_y,
                                 'ray_maxdia': ray_largest_diam,
@@ -523,35 +568,34 @@ for zone in zones:
                                 'circu': circularity,
                                 'pente_rim': max_slope_crater,
                                 'swirl': swirl_on_or_off,
-                                'hiesinger': floor_age,
-                                **common_attrs
+                                'hiesinger': floor_age
                             })
 
                             # Point for the 90° profiles
                             profil_90.extend([
                                 {
                                     'geometry': point_haut_vert_360,
+                                    **common_attrs,
                                     'max_alt': round(max_val_top, 1),
-                                    'position': "point haut",
-                                    **common_attrs
+                                    'position': "point haut"
                                 },
                                 {
                                     'geometry': point_haut_vert_180,
+                                    **common_attrs,
                                     'max_alt': round(max_val_bas, 1),
-                                    'position': "point bas",
-                                    **common_attrs
+                                    'position': "point bas"
                                 },
                                 {
                                     'geometry': point_haut_horiz_270,
+                                    **common_attrs,
                                     'max_alt': round(max_val_left, 1),
-                                    'position': "point gauche",
-                                    **common_attrs
+                                    'position': "point gauche"
                                 },
                                 {
                                     'geometry': point_haut_horiz_90,
+                                    **common_attrs,
                                     'max_alt': round(max_val_right, 1),
-                                    'position': "point droite",
-                                    **common_attrs
+                                    'position': "point droite"
                                 }
                             ])
 
@@ -568,9 +612,10 @@ for zone in zones:
         (Lines_visualisation,      f'results_geom_line_RG{zone}'),
         (centers,                  f'results_geom_centers_RG{zone}'),
         (rim_approx,               f'results_geom_rim_RG{zone}'),
-        (inner_slopes_results,     f'results_geom_slopes_RG{zone}')
+        (inner_slopes_results,     f'results_geom_slopes_RG{zone}'),
+        (results_slopes_20_80,     f'results_geom_slopes_20_80_RG{zone}'),
+        (results_slopes_30_70,     f'results_geom_slopes_30_70_RG{zone}')
     ]
-
     # Création et export des GeoDataFrames
     for data, filename in shapefile_data:
         gdf = gpd.GeoDataFrame(data, crs=craters.crs)

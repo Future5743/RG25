@@ -439,5 +439,5 @@ def visualisation3d (masked_image, crater_id, zone, swirl_on_or_off):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
     plt.savefig(save_path)
-    plt.show()
+    # plt.show()
     plt.close()

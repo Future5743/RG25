@@ -3,11 +3,14 @@
 ########################################################################################################################
 
 import numpy as np
+import sklearn
 from sklearn.decomposition import PCA
 import rasterio
+import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import os
+from shapely.geometry import LineString
 
 ########################################################################################################################
 ######################################################### CODE #########################################################
@@ -27,7 +30,6 @@ def distance_calculation(pos1, pos2, pixel_size):
 
     pixel_dist = np.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
     return pixel_dist * pixel_size
-
 
 
 def max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size):
@@ -52,41 +54,101 @@ def max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size):
     return np.max(slopes)
 
 
-
-def slopes_calculation(min_pos, min_value, max_value, max_coord_relative, pixel_size, dz):
+def slopes_calculation(demi_profils_value, demi_profils_coords_relatives, index_maximum, pixel_size, dz, out_transform,
+                       no_data_value, rate):
     '''
-    Compute the crater's slopes and their uncertainties with a simple method.
-    This method simply compute the slope formed by the highest and the lowest point on a semi-profile.
+    This function compute the crater's slopes and their uncertainties with a given percentage.
+    This method simply compute the slope formed by the profile given some percentage (e.g. a percentage of 20% leads to
+    the calculation of the slope between the point at 20% of the distance between the lowest and the highest point and
+    the point at 80% of the distance between the lowest and the highest point)
 
     Entries:
-        min_pos: tupple                        -- Relative coordinates of the crater's lowest point
-        min_value: float                       -- Elevation of the crater's lowest point
-        max_value: list                        -- Contains all the elevations of the maxima on the rim
-        max_coord_relative: list               -- Contains all the relative coordinates of the maxima on the rim
-        pixel_size: int                        -- Size of the pixel on the terrain
-        dz: float                              -- Vertical uncertainty
-
+        demi_profils_value: list                    -- Contains the elevation value of each point on the semi-profiles
+        demi_profils_coords_relatives: list         -- Contains the relative coordinates of each point on the
+                                                       semi-profiles
+        index_maximum: list                         -- Contains the index of the maximum point of each semi-profile
+        pixel_size: int                             -- Size of the pixel on the terrain
+        dz: float                                   -- Vertical uncertainty
+        out_transform: ???                          -- ???
+        rate: float                                 -- The wanted percentage to compute the slope
 
     Exit data:
-        slopes: list                           -- Contains the slopes of each semi-profiles
-        delta_slopes: list                     -- Contains the uncertainties associates with the slopes of each
-                                                  semi-profiles
+        slopes: list                                -- Contains the slopes value of each semi-profiles
+        delta_slopes: list                          -- Contains the uncertainties of each slope value for every
+                                                       semi-profiles
+        mean_slopes: list                           -- Contains the mean slope of each semi-profile
+        slope_geometry: list                        -- Contains the geometry of each slope for every semi-profiles
+
     '''
 
-    min_pos = list(min_pos)
-    if 0 in min_pos:
-        min_pos.remove(0)
+    slopes, delta_slopes, slope_geometry = [], [], []
 
-    slopes, delta_slopes = [], []
-    for point in range(len(max_value)):
-        dist = distance_calculation(min_pos, max_coord_relative[point], pixel_size)
-        delta_z = max_value[point] - min_value
+    demi_profils_value_function = demi_profils_value
+    demi_profils_coords_relatives_function = demi_profils_coords_relatives
+
+    index_demi_profil = 0
+
+    for demi_profil in demi_profils_coords_relatives_function:
+
+        demi_profils_value_function[index_demi_profil] = np.where(demi_profils_value_function[index_demi_profil] == no_data_value,
+                                                                  np.nan,
+                                                                  demi_profils_value_function[index_demi_profil])
+
+        demi_profil[0] = demi_profil[0][:index_maximum[index_demi_profil]]
+        demi_profil[1] = demi_profil[1][:index_maximum[index_demi_profil]]
+
+        demi_profils_value_function[index_demi_profil] = demi_profils_value_function[index_demi_profil][len(demi_profil):]
+
+        pos_point_min = int(rate * len(demi_profil[0]))
+
+        while np.isnan(demi_profils_value_function[index_demi_profil][pos_point_min]):
+            pos_point_min += 1
+
+        pos_point_max = int((1-rate) * len(demi_profil[1]))
+
+        while np.isnan(demi_profils_value_function[index_demi_profil][pos_point_max]):
+            pos_point_max -= 1
+
+        point_min = [demi_profil[0][pos_point_min], demi_profil[1][pos_point_min]]
+
+        point_max = [demi_profil[0][pos_point_max], demi_profil[1][pos_point_max]]
+
+        dist = distance_calculation(point_min, point_max, pixel_size)
+
+        delta_z = demi_profils_value_function[index_demi_profil][pos_point_max] - \
+                  demi_profils_value_function[index_demi_profil][pos_point_min]
+
         slope_rad = np.arctan(delta_z / dist)
         slope_deg = np.rad2deg(slope_rad)
 
-        x = min_pos[0] - max_coord_relative[point][0]
-        y = min_pos[1] - max_coord_relative[point][1]  # ← Correction ici
-        z = min_value - max_value[point]
+        real_coord_point_min = rasterio.transform.xy(out_transform,
+                                                     point_min[0],
+                                                     point_min[1])
+
+        real_coord_point_max = rasterio.transform.xy(out_transform,
+                                                     point_max[0],
+                                                     point_max[1])
+
+        slope_geometry.append(LineString([real_coord_point_min, real_coord_point_max]))
+
+        if slope_deg is np.nan:
+            print(
+                f'Position du point minimal dans le demi-profil: {pos_point_min}',
+                f'\nPosition du point maximal dans le demi-profil: {pos_point_max}',
+                f'\nCoordonnées relative du point minimal: {point_min}',
+                f'\nCoordonnées relative du point maximal: {point_max}',
+                f'\nHauteur du point minimal: {demi_profils_value_function[index_demi_profil][pos_point_min]}',
+                f'\nHauteur du point maximal: {demi_profils_value_function[index_demi_profil][pos_point_max]}',
+                f'\nDistance entre les deux points (m): {dist}',
+                f'\nDiffrence de profondeur entre les deux points: {delta_z}',
+                f'\nGeometrie: {LineString([real_coord_point_min, real_coord_point_max])}',
+                f'\nPente en radians: {slope_rad}',
+                f'\nPente en degres: {slope_deg}'
+            )
+
+        x = point_min[0] - point_max[0]
+        y = point_min[1] - point_max[1]
+        z = delta_z
 
         delta_slope = (1 / (1 + (z / dist)**2)) * np.sqrt(
             ((z * x / dist**3) * np.sqrt(2) * pixel_size)**2 +
@@ -97,8 +159,14 @@ def slopes_calculation(min_pos, min_value, max_value, max_coord_relative, pixel_
         slopes.append(round(slope_deg, 2))
         delta_slopes.append(round(delta_slope, 2))
 
-    return slopes, delta_slopes
+        index_demi_profil +=1
 
+    mean_slopes = round(np.nanmean(slopes), 2)
+
+    if mean_slopes is np.nan:
+        print(slopes)
+
+    return slopes, delta_slopes, mean_slopes, slope_geometry
 
 
 def compute_slope(points):
@@ -120,7 +188,6 @@ def compute_slope(points):
     if horizontal_norm == 0:
         return 0
     return abs(np.rad2deg(np.arctan(direction[2] / horizontal_norm)))
-
 
 
 def monte_carlo_uncertainty(points, n_simulations, dx, dz):
@@ -146,7 +213,6 @@ def monte_carlo_uncertainty(points, n_simulations, dx, dz):
         ], axis=1)
         slopes.append(compute_slope(noisy_points))
     return round(np.std(slopes), 2)
-
 
 
 def visualize_profile(points, slope, uncertainty, index):
@@ -187,7 +253,6 @@ def visualize_profile(points, slope, uncertainty, index):
     plt.show()
 
 
-
 def slope_calculation_by_PCA(demi_profils_value, demi_profils_coords_relatives, index_maximum,
                              out_transform, pixel_size, dz, n_simulations=100, visualize=False):
     '''
@@ -211,8 +276,8 @@ def slope_calculation_by_PCA(demi_profils_value, demi_profils_coords_relatives, 
         slopes_PCA: list                                   -- Contains the slopes computed by PCA of each semi-profiles
         uncertainties: list                                -- Contains the uncertainties associates with the slopes of
                                                               each semi-profiles
+        mean_slopes_PCA: float                             -- Is the mean of every slope of a crater
     '''
-
     slopes_PCA = []
     uncertainties = []
 
@@ -233,16 +298,17 @@ def slope_calculation_by_PCA(demi_profils_value, demi_profils_coords_relatives, 
         points = points[~np.isnan(points).any(axis=1)]
 
         slope = compute_slope(points)
-        # uncertainty = monte_carlo_uncertainty(points, n_simulations, pixel_size, dz)
+        uncertainty = monte_carlo_uncertainty(points, n_simulations, pixel_size, dz)
 
         slopes_PCA.append(round(slope, 2))
-        # uncertainties.append(uncertainty)
+        uncertainties.append(uncertainty)
 
         if visualize:
             visualize_profile(points, slope, uncertainty, i)
 
-    return slopes_PCA
+        mean_slopes_PCA = round(np.mean(slopes_PCA), 2)
 
+    return slopes_PCA, mean_slopes_PCA, uncertainties
 
 
 def smooth_profile(demi_profile, window_size=5):
@@ -256,23 +322,21 @@ def smooth_profile(demi_profile, window_size=5):
     Exit data:
         smoothed: list                  -- The elevation of the smoothed demi-profile
     '''
-
     demi_profile = np.array(demi_profile, dtype=np.float64)
     smoothed = np.full_like(demi_profile, np.nan)
 
+    half_window = window_size // 2
+
     for i in range(len(demi_profile)):
-        start = max(i - window_size // 2, 0)
-        end = min(i + window_size // 2 + 1, len(demi_profile))
+        start = max(i - half_window, 0)
+        end = min(i + half_window + 1, len(demi_profile))
         window = demi_profile[start:end]
-        valid = window[~np.isnan(window)]
-        if valid.size > 0:
-            smoothed[i] = np.mean(valid)
+        smoothed[i] = np.nanmean(window) if np.isnan(window).sum() < len(window) else np.nan
 
     return smoothed
 
 
-
-def compute_steepest_slope_3d(coords, elevations, index_max, window=10):
+def compute_steepest_slope_3d(coords, elevations, index_max):
     '''
     This function computes the steepest uphill slope segment in a 3D profile, ignoring the crater's lowest point
 
@@ -286,64 +350,38 @@ def compute_steepest_slope_3d(coords, elevations, index_max, window=10):
         best_segment: list          -- The coordinates (long, lat, elevation) of the two points delimiting the inner
                                        slope
     '''
+    coords = np.array(coords)[1:index_max]
+    elevations = np.array(elevations)[1:index_max]
 
-    coords = np.array(coords)
-    elevations = np.array(elevations)
-
-    # Ignore first point (assumed lowest or undesired)
-    coords = coords[1:index_max]
-    elevations = elevations[1:index_max]
-
-    if len(coords) <= 1:
+    n = len(coords)
+    if n <= 1:
         return None, None
 
-    window = min(window, len(coords) - 1)
-
-    window_max = min(int(0.9 * len(coords)), len(coords) - 1)
+    min_win = min(int(0.5 * n), n - 1)
+    max_win = min(int(0.9 * n), n - 1)
 
     max_slope = -np.inf
     best_segment = None
 
-    print(window, window_max)
-
-    if window < window_max:
-        for window_change in range(window, window_max):
-
-            for i in range(len(coords) - window_change):
-                z1, z2 = elevations[i], elevations[i + window_change]
-                if np.isnan([z1, z2]).any():
-                    continue
-
-                p1, p2 = coords[i], coords[i + window_change]
-                horiz_dist = np.linalg.norm(p2 - p1)
-                vert_dist = z2 - z1
-
-                slope_rad = np.arctan2(vert_dist, horiz_dist)
-                slope_deg = np.degrees(slope_rad)
-
-                if slope_deg > max_slope:
-                    max_slope = slope_deg
-                    best_segment = [(p1[0], p1[1], z1), (p2[0], p2[1], z2)]
-
-    if window >= window_max or best_segment is None:
-        for i in range(len(coords) - window):
-            z1, z2 = elevations[i], elevations[i + window]
-            if np.isnan([z1, z2]).any():
+    for win in range(min_win, max_win + 1):
+        for i in range(n - win):
+            z1, z2 = elevations[i], elevations[i + win]
+            if np.isnan(z1) or np.isnan(z2):
                 continue
 
-            p1, p2 = coords[i], coords[i + window]
+            p1, p2 = coords[i], coords[i + win]
             horiz_dist = np.linalg.norm(p2 - p1)
-            vert_dist = z2 - z1
+            if horiz_dist == 0:
+                continue
 
-            slope_rad = np.arctan2(vert_dist, horiz_dist)
-            slope_deg = np.degrees(slope_rad)
+            vert_dist = z2 - z1
+            slope_deg = np.degrees(np.arctan2(vert_dist, horiz_dist))
 
             if slope_deg > max_slope:
                 max_slope = slope_deg
                 best_segment = [(p1[0], p1[1], z1), (p2[0], p2[1], z2)]
 
     return max_slope, best_segment
-
 
 
 def save_smoothed_profile(smoothed, coords, index, zone, crater_id, swirl_status, index_max):
@@ -361,7 +399,6 @@ def save_smoothed_profile(smoothed, coords, index, zone, crater_id, swirl_status
     Exit data:
         No exit data
     '''
-
     coords = np.array(coords)
     smoothed = np.array(smoothed)
 
@@ -370,16 +407,11 @@ def save_smoothed_profile(smoothed, coords, index, zone, crater_id, swirl_status
     fig = plt.figure(figsize=(20, 10))
     ax = fig.add_subplot(111, projection='3d')
 
-    # Plot profile
-    ax.scatter(coords[:, 0], coords[:, 1], smoothed,
-               marker='x', color='orange', label='Profil lissé')
+    ax.scatter(coords[:, 0], coords[:, 1], smoothed, marker='x', color='orange', label='Profil lissé')
 
-    # Plot steepest segment
     if segment:
         seg = np.array(segment)
-        ax.plot(seg[:, 0], seg[:, 1], seg[:, 2],
-                color='blue', linewidth=4,
-                label=f'Slope ({slope_deg:.1f}°)')
+        ax.plot(seg[:, 0], seg[:, 1], seg[:, 2], color='blue', linewidth=4, label=f'Slope ({slope_deg:.1f}°)')
 
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
@@ -387,18 +419,58 @@ def save_smoothed_profile(smoothed, coords, index, zone, crater_id, swirl_status
     ax.set_title(f'Demi-profil {index * 10}°')
     ax.legend()
 
-    # Save figure
     subfolder = 'on_swirl' if swirl_status == 'on-swirl' else 'off_swirl'
     path = os.path.join('results', f'RG{zone}', 'profils', subfolder, str(crater_id), 'inner_slope')
     os.makedirs(path, exist_ok=True)
+
     filename = f'Profil3D_demi_{index * 10}.png'
     plt.savefig(os.path.join(path, filename))
     plt.close()
 
 
+### Monte Cralo
+
+def estimate_uncertainty_per_profile(demi_profils_value, demi_profils_coords_relatives, index_maximum, out_transform,
+                                     dx, dy, n_iter=500):
+    slope_uncertainties = []
+
+    for i, (values, (rows, cols)) in enumerate(zip(demi_profils_value, demi_profils_coords_relatives)):
+        slopes = []
+
+        for _ in range(n_iter):
+            # Perturber les coordonnées
+            perturbed_coords = []
+            for r, c in zip(rows, cols):
+                x, y = rasterio.transform.xy(out_transform, r, c)
+                x += np.random.normal(0, dx)
+                y += np.random.normal(0, dx)
+                perturbed_coords.append([x, y])
+
+            # Perturber les altitudes
+            perturbed_values = np.array(values) + np.random.normal(0, dy, size=len(values))
+
+            # Lissage et pente
+            smoothed = smooth_profile(perturbed_values, window_size=5)
+            slope_deg, _ = compute_steepest_slope_3d(perturbed_coords, smoothed, index_maximum[i])
+
+            slopes.append(slope_deg)
+
+        # Nettoyer les NaN éventuels
+        slopes = np.array(slopes)
+        slopes = slopes[~np.isnan(slopes)]
+
+        if len(slopes) == 0:
+            slope_uncertainties.append(np.nan)
+        else:
+            slope_uncertainties.append(round(np.std(slopes), 2))
+
+    return slope_uncertainties
+
+
+
 
 def inner_slopes(inner_slopes_deg, inner_slopes_delimitation, demi_profils_value, demi_profils_coords_relatives, zone,
-                 crater_id, swirl_on_or_off, out_transform, index_maximum):
+                 crater_id, swirl_on_or_off, out_transform, index_maximum, dx, dy):
     '''
     This function compute a crater's inner slopes, and save it.
 
@@ -417,27 +489,58 @@ def inner_slopes(inner_slopes_deg, inner_slopes_delimitation, demi_profils_value
         out_transform: ???                          -- ???
 
     Exit data:
-        No exit data
+        mean_carter_slope: float                    -- Is the mean of all the slopes of a crater
+        slope_uncertainty: list                     -- Is the uncertainty of the
     '''
-
     for i, (values, (rows, cols)) in enumerate(zip(demi_profils_value, demi_profils_coords_relatives)):
-        # Convertir les indices en coordonnées réelles
         demi_coords = [list(rasterio.transform.xy(out_transform, r, c)) for r, c in zip(rows, cols)]
 
-        # Lissage du profil
         smoothed = smooth_profile(values, window_size=5)
-
-        # Calcul de la pente maximale
         slope_deg, segment = compute_steepest_slope_3d(demi_coords, smoothed, index_maximum[i])
 
-        # Stockage des résultats
         inner_slopes_deg.append(slope_deg)
         inner_slopes_delimitation.append(segment)
 
-        # Sauvegarde du profil lissé et de la pente
         save_smoothed_profile(smoothed, demi_coords, i, zone, crater_id, swirl_on_or_off, index_maximum[i])
 
+    mean_crater_slope = np.mean(inner_slopes_deg)
+    # slope_uncertainty = estimate_uncertainty_per_profile(demi_profils_value, demi_profils_coords_relatives,
+    #                                                      index_maximum, out_transform, dx=5, dy=2, n_iter=500)
+
+    return round(mean_crater_slope, 2)
 
 
+'''
+# Profil Horizontal
+    # Trouver la plus basse altitude et la plus haute altitude entre celle de l'Est 
+    # et celle de l'Ouest
+    petite_altitude = min(max_val_right, max_val_left)
+    grande_altitude = max(max_val_right, max_val_left)
 
+    # Calculer la différence d'altitude
+    altitude_difference = round(grande_altitude - petite_altitude, 4)
 
+    # Calculer la pente en radians avec NumPy
+    slope_radians = round(np.arctan(altitude_difference / distance_right_left), 4)
+
+    # Convertir la pente en degrés
+    slope_degrees_eo = round(np.degrees(slope_radians), 4)
+
+# Profil Vertical
+    # Trouver la plus basse altitude et la plus haute altitude entre celle du Nord 
+    # et celle du Sud
+    petite_altitude_ns = min(max_val_top, max_val_bas)
+    grande_altitude_ns = max(max_val_top, max_val_bas)
+
+    # Calculer la différence d'altitude
+    altitude_difference_ns = round(grande_altitude_ns - petite_altitude_ns, 4)
+
+    # Calculer la pente en radians avec NumPy
+    slope_radians_ns = round(np.arctan(altitude_difference_ns / distance_bas_top), 4)
+
+    # Convertir la pente en degrés
+    slope_degrees_ns = round(np.degrees(slope_radians_ns), 4)
+
+# Pente max entre les deux profils du cratère
+    pente_max = round(max(slope_degrees_ns, slope_degrees_eo), 1)
+'''
