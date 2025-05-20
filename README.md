@@ -34,13 +34,14 @@ Here the one you specifically need to download :
 Here is an example of this data organization.
 
 📁 data\
-├──💾NAC_DTM_REINER1.tiff\
-├──💾NAC_DTM_REINER2.tiff\
-├──💾NAC_DTM_REINER3.tiff\
-├──💾NAC_DTM_REINER4.tiff\
-├──💾NAC_DTM_REINER5.tiff\
-├──💾NAC_DTM_REINER6.tiff\
-├──💾NAC_DTM_REINER7.tiff\
+└──📁RG
+│   ├──💾NAC_DTM_REINER1.tiff\
+│   ├──💾NAC_DTM_REINER2.tiff\
+│   ├──💾NAC_DTM_REINER3.tiff\
+│   ├──💾NAC_DTM_REINER4.tiff\
+│   ├──💾NAC_DTM_REINER5.tiff\
+│   ├──💾NAC_DTM_REINER6.tiff\
+│   └──💾NAC_DTM_REINER7.tiff\
 📁 RG25 (This repository)\
 ├── 📁 data\
 ├── 📁 results\
@@ -51,7 +52,7 @@ Here is an example of this data organization.
 ├── 🐍Slopes.py\
 ├── 🐍TRI.py\
 ├── 🐍Topographical_profiles.py\
-├── 🐍calculs_5m.py
+└── 🐍calculs_5m.py
 
 ⚠️ If you adopt a different data organization structure, please change the paths in calculs_5m.py.
 
