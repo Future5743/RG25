@@ -1,20 +1,21 @@
 # RG25
 
 ## Setting up
+This code was developped with python 3.12.7
 
 ### Libraries
-To ensure the code operation, you need ths following libraries. The written version are those use during the development of the code.
-| Libraries | Version|
-|:-----------|:--------|
-| geopandas | v1.0.1 |
-| matplotlib | v3.10.0 |
-| numpy | v1.26.4 |
-| rasterio | v1.4.3 |
-| shapely | v2.0.6 |
-| tqdm | v4.67.1 |
-| scikit-learn | v1.5.1 |
-| scikit-image | v0.25.0 |
-| scipy | v1.13.1 |
+The following libraries are required to ensure that the code functions correctly. The written versions are those used during code development.
+| Libraries | Version| Documentation|
+|:-----------|:--------|:-----------|
+| geopandas | v1.0.1 | https://geopandas.org/en/stable/docs.html|
+| matplotlib | v3.10.0 | https://matplotlib.org/stable/index.html|
+| numpy | v1.26.4 | https://numpy.org/doc/1.26/ |
+| rasterio | v1.4.3 | https://rasterio.readthedocs.io/en/latest/index.html |
+| shapely | v2.0.6 | https://shapely.readthedocs.io/en/stable/manual.html |
+| tqdm | v4.67.1 | https://pypi.org/project/tqdm/ |
+| scikit-learn | v1.5.1 | https://scikit-learn.org/stable/index.html |
+| scikit-image | v0.25.0 | https://scikit-image.org/docs/stable/ |
+| scipy | v1.13.1 | https://docs.scipy.org/doc//scipy/index.html |
 
 ### Exterior data required
 To use correctly the code, you need to download some extra data from the [LROC website](https://wms.lroc.asu.edu/lroc/rdr_product_select?filter%5Btext%5D=rein&filter%5Blat%5D=&filter%5Blon%5D=&filter%5Brad%5D=&filter%5Bwest%5D=&filter%5Beast%5D=&filter%5Bsouth%5D=&filter%5Bnorth%5D=&filter%5Bprefix%5D%5B%5D=NAC_DTM&show_thumbs=0&per_page=10&commit=Search).
