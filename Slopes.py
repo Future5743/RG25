@@ -121,30 +121,11 @@ def slopes_calculation(demi_profils_value, demi_profils_coords_relatives, index_
         slope_rad = np.arctan(delta_z / dist)
         slope_deg = np.rad2deg(slope_rad)
 
-        real_coord_point_min = rasterio.transform.xy(out_transform,
-                                                     point_min[0],
-                                                     point_min[1])
+        real_coord_point_min = rasterio.transform.xy(out_transform, point_min[0], point_min[1])
 
-        real_coord_point_max = rasterio.transform.xy(out_transform,
-                                                     point_max[0],
-                                                     point_max[1])
+        real_coord_point_max = rasterio.transform.xy(out_transform, point_max[0], point_max[1])
 
         slope_geometry.append(LineString([real_coord_point_min, real_coord_point_max]))
-
-        if slope_deg is np.nan:
-            print(
-                f'Position du point minimal dans le demi-profil: {pos_point_min}',
-                f'\nPosition du point maximal dans le demi-profil: {pos_point_max}',
-                f'\nCoordonnées relative du point minimal: {point_min}',
-                f'\nCoordonnées relative du point maximal: {point_max}',
-                f'\nHauteur du point minimal: {demi_profils_value_function[index_demi_profil][pos_point_min]}',
-                f'\nHauteur du point maximal: {demi_profils_value_function[index_demi_profil][pos_point_max]}',
-                f'\nDistance entre les deux points (m): {dist}',
-                f'\nDiffrence de profondeur entre les deux points: {delta_z}',
-                f'\nGeometrie: {LineString([real_coord_point_min, real_coord_point_max])}',
-                f'\nPente en radians: {slope_rad}',
-                f'\nPente en degres: {slope_deg}'
-            )
 
         x = point_min[0] - point_max[0]
         y = point_min[1] - point_max[1]
@@ -159,12 +140,9 @@ def slopes_calculation(demi_profils_value, demi_profils_coords_relatives, index_
         slopes.append(round(slope_deg, 2))
         delta_slopes.append(round(delta_slope, 2))
 
-        index_demi_profil +=1
+        index_demi_profil += 1
 
     mean_slopes = round(np.nanmean(slopes), 2)
-
-    if mean_slopes is np.nan:
-        print(slopes)
 
     return slopes, delta_slopes, mean_slopes, slope_geometry
 
@@ -544,3 +522,101 @@ def inner_slopes(inner_slopes_deg, inner_slopes_delimitation, demi_profils_value
 # Pente max entre les deux profils du cratère
     pente_max = round(max(slope_degrees_ns, slope_degrees_eo), 1)
 '''
+
+def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives, pixel_size, out_transform,
+                              no_data_value, rate):
+    slopes_px_to_px = []
+    slopes = []
+    geom = []
+
+    for i, (profil_coords, profil_values) in enumerate(zip(demi_profils_coords_relatives, demi_profils_value)):
+        m = len(profil_coords[0])
+        demi_profil = [[profil_coords[0][j], profil_coords[1][j], profil_values[j]] for j in range(m)]
+
+        demi_profil = np.where(demi_profil == no_data_value, np.nan, demi_profil)
+
+        # Trouver le point maximum (fin) non NaN
+        i_max = -1
+        while np.isnan(demi_profil[i_max][2]):
+            i_max -= 1
+        point_max = demi_profil[i_max][2]
+
+        # Trouver le point minimum (début) non NaN
+        i_min = 0
+        while np.isnan(demi_profil[i_min][2]):
+            i_min += 1
+        point_min = demi_profil[i_min][2]
+
+        depth_total = point_max - point_min
+        alt_min = rate * depth_total + point_min
+        alt_max = (1-rate) * depth_total + point_min
+
+        # Initialisation des points internes les plus proches des altitudes cibles
+        point_inner_min = point_inner_max = None
+        index_min_inner = index_max_inner = -1
+        min_dist_min = min_dist_max = np.inf
+
+        for j, (_, _, z) in enumerate(demi_profil):
+            if np.isnan(z):
+                continue
+            if abs(z - alt_min) < min_dist_min:
+                min_dist_min = abs(z - alt_min)
+                point_inner_min = demi_profil[j]
+                index_min_inner = j
+            if abs(z - alt_max) < min_dist_max:
+                min_dist_max = abs(z - alt_max)
+                point_inner_max = demi_profil[j]
+                index_max_inner = j
+
+        # S'assurer de l'ordre des indices
+        if index_min_inner > index_max_inner:
+            index_min_inner, index_max_inner = index_max_inner, index_min_inner
+            point_inner_min, point_inner_max = point_inner_max, point_inner_min
+
+        if point_inner_min is None or point_inner_max is None:
+            print(demi_profil)
+
+            print(f"Profil {i}: point_inner_min ou point_inner_max est None")
+            slopes_px_to_px.append(np.nan)
+            slopes.append(np.nan)
+            geom.append(None)
+            continue
+
+        # Calcul des pentes px à px
+        s = []
+        for j in range(index_min_inner, index_max_inner):
+            pt1 = demi_profil[j]
+            pt2 = demi_profil[j + 1]
+            dist = distance_calculation(pt1[:-1], pt2[:-1], pixel_size)
+            if dist == 0:
+                continue
+            dz = pt2[-1] - pt1[-1]
+            s.append(round(np.rad2deg(np.arctan(dz / dist)), 2))
+
+        mean_slope_px = round(np.nanmean(s), 2) if s else np.nan
+        slopes_px_to_px.append(mean_slope_px)
+
+        # Calcul de la pente entre les deux points internes
+        dist_total = distance_calculation(point_inner_min[:-1], point_inner_max[:-1], pixel_size)
+
+        if dist_total == 0:
+            print(f"Profil {i}: Distance totale = 0 entre {point_inner_min[:-1]} et {point_inner_max[:-1]}")
+            slopes.append(np.nan)
+        else:
+            depth = abs(point_inner_max[-1] - point_inner_min[-1])
+            slope = round(np.rad2deg(np.arctan(depth / dist_total)), 2)
+            slopes.append(slope)
+
+        # Construction de la géométrie
+        geom.append(LineString([
+            rasterio.transform.xy(out_transform, point_inner_min[0], point_inner_min[1]),
+            rasterio.transform.xy(out_transform, point_inner_max[0], point_inner_max[1])
+        ]))
+
+    return slopes, slopes_px_to_px, geom, round(np.mean(slopes), 2), round(np.mean(slopes_px_to_px), 2)
+
+
+
+
+
+
