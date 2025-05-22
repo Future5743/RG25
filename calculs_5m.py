@@ -14,8 +14,7 @@ from shapely.geometry import Point, Polygon, LineString
 from tqdm import tqdm
 from Maximum_search import Finding_maxima, horizontal_90, horizontal_270, vertical_360, vertical_180
 from Circularity import Miller_index
-from Slopes import max_crater_slopes_calculation, slopes_calculation, slope_calculation_by_PCA, inner_slopes, \
-    slopes_stopar_calculation
+from Slopes import max_crater_slopes_calculation, slope_calculation_by_PCA, inner_slopes, slopes_stopar_calculation
 from TRI import TRI
 from Topographical_profiles import main, visualisation3d
 
@@ -443,21 +442,45 @@ for zone in zones:
                                                             out_transform, index_maximum,
                                                             pixel_size_tb, precision_error)
 
-                            slopes_stopar_20, slopes_px2px_20, slopes_stopar_geom_20, mean_slope_stopar_20, \
-                            mean_slope_px2px_20 = slopes_stopar_calculation(demi_profiles_value,
-                                                                            demi_profiles_coords_relatives,
-                                                                            pixel_size_tb,
-                                                                            out_transform,
-                                                                            no_data_value,
-                                                                            rate=0.2)
+                            (
+                                slopes_stopar_20,
+                                slopes_px2px_20,
+                                slopes_stopar_geom_20,
+                                mean_slope_stopar_20,
+                                mean_slope_px2px_20,
+                                delta_stopar_20,
+                                delta_stopar_px2px_20
+                            ) = slopes_stopar_calculation(
+                                demi_profiles_value,
+                                demi_profiles_coords_relatives,
+                                depth,
+                                min_val,
+                                pixel_size_tb,
+                                precision_error,
+                                out_transform,
+                                no_data_value,
+                                rate=0.2
+                            )
 
-                            slopes_stopar_30, slopes_px2px_30, slopes_stopar_geom_30, mean_slope_stopar_30, \
-                            mean_slope_px2px_30 = slopes_stopar_calculation(demi_profiles_value,
-                                                                            demi_profiles_coords_relatives,
-                                                                            pixel_size_tb,
-                                                                            out_transform,
-                                                                            no_data_value,
-                                                                            rate=0.3)
+                            (
+                                slopes_stopar_30,
+                                slopes_px2px_30,
+                                slopes_stopar_geom_30,
+                                mean_slope_stopar_30,
+                                mean_slope_px2px_30,
+                                delta_stopar_30,
+                                delta_stopar_px2px_30
+                            ) = slopes_stopar_calculation(
+                                demi_profiles_value,
+                                demi_profiles_coords_relatives,
+                                depth,
+                                min_val,
+                                pixel_size_tb,
+                                precision_error,
+                                out_transform,
+                                no_data_value,
+                                rate=0.3
+                            )
 
                             # visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
 
@@ -506,7 +529,9 @@ for zone in zones:
                                     **common_attrs,
                                     'position': f'Ligne à {angle}°',
                                     'slope': slopes_stopar_20[i],
+                                    'δ_slope': delta_stopar_20[i],
                                     'slopePX2PX': slopes_px2px_20[i],
+                                    'δ_px2px': delta_stopar_px2px_20[i],
                                     'mean_slope': mean_slope_stopar_20,
                                     'meanPX2PX': mean_slope_px2px_20
                                 })
@@ -516,7 +541,9 @@ for zone in zones:
                                     **common_attrs,
                                     'position': f'Ligne à {angle}°',
                                     'slope': slopes_stopar_30[i],
+                                    'δ_slope': delta_stopar_30[i],
                                     'slopePX2PX': slopes_px2px_30[i],
+                                    'δ_px2px': delta_stopar_px2px_30[i],
                                     'mean_slope': mean_slope_stopar_30,
                                     'meanPX2PX': mean_slope_px2px_30
                                 })

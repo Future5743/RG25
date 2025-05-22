@@ -37,13 +37,13 @@ Here is an example of this data organization:
 ```
 📁 data
 └──📁RG
-│   ├──💾NAC_DTM_REINER1.tiff
-│   ├──💾NAC_DTM_REINER2.tiff
-│   ├──💾NAC_DTM_REINER3.tiff
-│   ├──💾NAC_DTM_REINER4.tiff
-│   ├──💾NAC_DTM_REINER5.tiff
-│   ├──💾NAC_DTM_REINER6.tiff
-│   └──💾NAC_DTM_REINER7.tiff
+    ├──💾NAC_DTM_REINER1.tiff
+    ├──💾NAC_DTM_REINER2.tiff
+    ├──💾NAC_DTM_REINER3.tiff
+    ├──💾NAC_DTM_REINER4.tiff
+    ├──💾NAC_DTM_REINER5.tiff
+    ├──💾NAC_DTM_REINER6.tiff
+    └──💾NAC_DTM_REINER7.tiff
 📁 RG25 (This repository)
 ├── 📁 data
 ├── 📁 results
@@ -82,21 +82,21 @@ This repository is organized following this structure:
 │   │   └── 📁 off-swirl -- This folder contains the profiles of the crater in the off-swirl zone  
 │   │       └── 📁 id -- This folder contains the profiles of the crater of a specific id  
 │   └── 📁 TRI -- This folder contains the TRI images of the craters of RG2  
-├── 📁 RG7 -- This folder contains results of RG7  
-│   ├── 📁 profils -- This folder contains the craters profiles of RG7  
-│   └── 📁 TRI -- This folder contains the TRI images of the craters of RG7  
+└── 📁 RG7 -- This folder contains results of RG7  
+    ├── 📁 profils -- This folder contains the craters profiles of RG7  
+    └── 📁 TRI -- This folder contains the TRI images of the craters of RG7  
 
 ```
 
 ### Python scripts
 This are the python files of this repository and their function. The calculs_5m.py is the "main" of this repository : you need to run it to compute your data.
 
-```
-🐍Circularity.py -- This script calculates the circularity of craters
-🐍Graph_dtoD.py -- This script generates graphs showing d/D versus diameter with uncertainties
-🐍Maximum_search.py -- This script finds the altitude maxima for each profile every 10°
-🐍Slopes.py -- This script finds crater slopes
-🐍TRI.py -- This script calculates the TRI index and saves it as an image
-🐍Topographical_profiles.py -- This script draws profiles every 10° and the average crater profile
-🐍calculs_5m.py -- This script is used to process the craters by calling the preceding scripts
-```
+| Pyhton files |  Description |
+|:-------------|:-------------|
+|🐍Circularity.py | This script calculates the circularity of craters |
+|🐍Graph_dtoD.py | This script generates graphs showing d/D versus diameter with uncertainties |
+|🐍Maximum_search.py | This script finds the altitude maxima for each profile every 10° |
+|🐍Slopes.py | This script finds crater slopes |
+|🐍TRI.py | This script calculates the TRI index and saves it as an image |
+|🐍Topographical_profiles.py | This script draws profiles every 10° and the average crater profile |
+|🐍calculs_5m.py | This script is used to process the craters by calling the preceding scripts |
