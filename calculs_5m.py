@@ -414,12 +414,12 @@ for zone in zones:
 
                             ### --- CREATING TOPOGRAPHIC PROFILES --- ###
 
-                            #main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swirl_on_or_off,
-                            #     zone, crater_id)
+                            main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swirl_on_or_off,
+                                 zone, crater_id)
 
                             ### --- TRI ALGORITHM --- ###
-                            #TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
-                            #    craters.crs)
+                            TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
+                                craters.crs)
 
                             ### --- SLOPES CALCULATION --- ###
 
@@ -431,7 +431,7 @@ for zone in zones:
                                                                                              precision_error,
                                                                                              n_simulations=100,
                                                                                              visualize=False)
-
+                            """
                             inner_slopes_deg, inner_slopes_delimitation = [], []
 
                             mean_inner_slope = inner_slopes(inner_slopes_deg,
@@ -441,7 +441,7 @@ for zone in zones:
                                                             zone, crater_id, swirl_on_or_off,
                                                             out_transform, index_maximum,
                                                             pixel_size_tb, precision_error)
-
+                            """
                             (
                                 slopes_stopar_20,
                                 slopes_px2px_20,
@@ -482,7 +482,7 @@ for zone in zones:
                                 rate=0.3
                             )
 
-                            # visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
+                            visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
 
                             # Commune attributes
                             common_attrs = {
@@ -511,6 +511,7 @@ for zone in zones:
                                     'position': f'Point à {angle}°'
                                 })
 
+                                """
                                 point1 = list(inner_slopes_delimitation[i][0][:2])
 
                                 point2 = list(inner_slopes_delimitation[i][1][:2])
@@ -523,6 +524,7 @@ for zone in zones:
                                     'meanSlope': mean_inner_slope,
                                     # 'δ_slope': uncertainty_inner_slope[i]
                                 })
+                                """
 
                                 results_slopes_stopar_20.append({
                                     'geometry': slopes_stopar_geom_20[i],
@@ -635,7 +637,7 @@ for zone in zones:
         (Lines_visualisation,           f'results_geom_line_RG{zone}'),
         (centers,                       f'results_geom_centers_RG{zone}'),
         (rim_approx,                    f'results_geom_rim_RG{zone}'),
-        (inner_slopes_results,          f'results_geom_slopes_RG{zone}'),
+        # (inner_slopes_results,          f'results_geom_slopes_RG{zone}'),
         (results_slopes_stopar_20,      f'results_geom_slopes_stopar_20_RG{zone}'),
         (results_slopes_stopar_30,      f'results_geom_slopes_stopar_30_RG{zone}')
     ]
