@@ -551,6 +551,7 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
     uncertainty_slope_px_to_px = []
 
     geom = []
+    alt_points_inner = []
 
     for i, (profil_coords, profil_values) in enumerate(zip(demi_profils_coords_relatives, demi_profils_value)):
 
@@ -593,6 +594,8 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
             slopes.append(np.nan)
             geom.append(None)
             continue
+        
+        alt_points_inner.append([point_inner_min[2], point_inner_max[2]])
 
         slopes_point_inner_max_inner_min(slopes, uncertainty_slope, i, point_inner_min, point_inner_max, pixel_size, dz)
 
@@ -613,4 +616,4 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
         ]))
 
     return slopes, slopes_px_to_px, geom, round(np.mean(slopes), 2), round(np.mean(slopes_px_to_px), 2), \
-           uncertainty_slope, uncertainty_slope_px_to_px
+           uncertainty_slope, uncertainty_slope_px_to_px, alt_points_inner

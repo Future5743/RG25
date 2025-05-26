@@ -23,7 +23,7 @@ from Topographical_profiles import main, visualisation3d
 ##################################################### DATA OPENING #####################################################
 ########################################################################################################################
 
-zones = ['2', '7']
+zones = ['7']
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 zone_settings = {
@@ -49,7 +49,7 @@ for zone in zones:
 
     # Path for data
     crater_shapefile_path = os.path.join('data', 'Buffer_crateres', f'Buffer_RG{zone}')
-    raster_path = os.path.join('..', 'data', 'RG', f'NAC_DTM_REINER{zone}.tiff')
+    raster_path = os.path.join('..', 'data', 'RG', f'NAC_DTM_REINER{zone}.TIF')
     hiesinger_path = os.path.join('data', 'HIESINGER2011_MARE_AGE_UNITS_180', 'HIESINGER2011_MARE_AGE_UNITS_180.SHP')
     swirls_path = os.path.join('data', 'Swirl', 'REINER_GAMMA.shp')
 
@@ -412,15 +412,6 @@ for zone in zones:
                             rim_approx_smooth_geom = smooth_polygon_with_bezier(rim_approx_geom)
                             '''
 
-                            ### --- CREATING TOPOGRAPHIC PROFILES --- ###
-
-                            main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swirl_on_or_off,
-                                 zone, crater_id)
-
-                            ### --- TRI ALGORITHM --- ###
-                            TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
-                                craters.crs)
-
                             ### --- SLOPES CALCULATION --- ###
 
                             slopes_PCA, mean_slope_PCA, delta_PCA = slope_calculation_by_PCA(demi_profiles_value,
@@ -449,7 +440,8 @@ for zone in zones:
                                 mean_slope_stopar_20,
                                 mean_slope_px2px_20,
                                 delta_stopar_20,
-                                delta_stopar_px2px_20
+                                delta_stopar_px2px_20,
+                                alt_points_inner_20
                             ) = slopes_stopar_calculation(
                                 demi_profiles_value,
                                 demi_profiles_coords_relatives,
@@ -469,7 +461,8 @@ for zone in zones:
                                 mean_slope_stopar_30,
                                 mean_slope_px2px_30,
                                 delta_stopar_30,
-                                delta_stopar_px2px_30
+                                delta_stopar_px2px_30,
+                                alt_points_inner_30
                             ) = slopes_stopar_calculation(
                                 demi_profiles_value,
                                 demi_profiles_coords_relatives,
@@ -483,6 +476,15 @@ for zone in zones:
                             )
 
                             visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
+                            
+                            ### --- CREATING TOPOGRAPHIC PROFILES --- ###
+
+                            main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swirl_on_or_off,
+                                 zone, crater_id, alt_points_inner_20, alt_points_inner_30)
+
+                            ### --- TRI ALGORITHM --- ###
+                            TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
+                                craters.crs)
 
                             # Commune attributes
                             common_attrs = {
