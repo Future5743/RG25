@@ -559,12 +559,13 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
         demi_profil = [[profil_coords[0][j], profil_coords[1][j], profil_values[j]] for j in range(m)]
 
         demi_profil = np.where(demi_profil == no_data_value, np.nan, demi_profil)
-
+        profil_values_clean = np.array(profil_values)
+        profil_values_clean = profil_values_clean[~np.isnan(profil_values_clean)]
+        min_val_profil = np.min(profil_values_clean)
 
         alt_min = rate * depth[i] + min_val
         alt_max = (1 - rate) * depth[i] + min_val
 
-        # Initialisation des points internes les plus proches des altitudes cibles
         point_inner_min = point_inner_max = None
         index_min_inner = index_max_inner = -1
         min_dist_min = min_dist_max = np.inf
@@ -576,27 +577,40 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
                 min_dist_min = abs(z - alt_min)
                 point_inner_min = demi_profil[j]
                 index_min_inner = j
-
             if abs(z - alt_max) < min_dist_max:
                 min_dist_max = abs(z - alt_max)
                 point_inner_max = demi_profil[j]
                 index_max_inner = j
 
-        # S'assurer de l'ordre des indices
+        # S'assurer de l'ordre
         if index_min_inner > index_max_inner:
             index_min_inner, index_max_inner = index_max_inner, index_min_inner
             point_inner_min, point_inner_max = point_inner_max, point_inner_min
 
+        # Vérifie si l’un des points est égal à la valeur minimale brute du profil
+        if point_inner_min is not None and point_inner_min[2] == min_val_profil:
+            if index_min_inner + 1 < len(demi_profil) and not np.isnan(demi_profil[index_min_inner + 1][2]):
+                point_inner_min = demi_profil[index_min_inner + 1]
+            elif index_min_inner - 1 >= 0 and not np.isnan(demi_profil[index_min_inner - 1][2]):
+                point_inner_min = demi_profil[index_min_inner - 1]
+
+        if point_inner_max is not None and point_inner_max[2] == min_val_profil:
+            if index_max_inner + 1 < len(demi_profil) and not np.isnan(demi_profil[index_max_inner + 1][2]):
+                point_inner_max = demi_profil[index_max_inner + 1]
+            elif index_max_inner - 1 >= 0 and not np.isnan(demi_profil[index_max_inner - 1][2]):
+                point_inner_max = demi_profil[index_max_inner - 1]
+
         if point_inner_min is None or point_inner_max is None:
-            print(demi_profil)
             print(f"Profil {i}: point_inner_min ou point_inner_max est None")
             slopes_px_to_px.append(np.nan)
             slopes.append(np.nan)
             geom.append(None)
+            alt_points_inner.append([np.nan, np.nan])  # Toujours deux valeurs
             continue
-        
+
         alt_points_inner.append([point_inner_min[2], point_inner_max[2]])
 
+        # Calculs des pentes...
         slopes_point_inner_max_inner_min(slopes, uncertainty_slope, i, point_inner_min, point_inner_max, pixel_size, dz)
 
         # Calcul des pentes px à px
@@ -609,7 +623,7 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
         slopes_px_to_px.append(mean_slope_px)
         uncertainty_slope_px_to_px.append(mean_uncertainty)
 
-        # Construction de la géométrie
+        # Construction géométrie
         geom.append(LineString([
             rasterio.transform.xy(out_transform, point_inner_min[0], point_inner_min[1]),
             rasterio.transform.xy(out_transform, point_inner_max[0], point_inner_max[1])

@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import os
 import math
 import numpy as np
+from scipy.interpolate import CubicSpline
+from scipy.signal import savgol_filter
 
 ########################################################################################################################
 ######################################################### CODE #########################################################
@@ -70,7 +72,6 @@ def calculate_cumulative_distances(coords_x, coords_y, pixel_size_tb):
     ]
 
 
-
 def process_profile(demi_profils_value, demi_profils_coords_relatives, i, pixel_size_tb, min_X):
     '''
     Process the individual profile for a given index (here to each 10°).
@@ -122,67 +123,238 @@ def process_profile(demi_profils_value, demi_profils_coords_relatives, i, pixel_
     return full_profile, X, min_X, limit_profil
 
 
+def profile_derivative(full_profile, X):
+    full_profile = np.array(full_profile)
+    X = np.array(X)
+
+    if not np.all(np.isfinite(full_profile)):
+        index_nan = np.where(np.isnan(full_profile))
+
+        for i in index_nan[0]:
+            a = i
+            if i < len(full_profile)/2:
+                while np.isnan(full_profile[i]):
+                    a += 1
+                    full_profile[i] = full_profile[a]
+            else:
+                while np.isnan(full_profile[i]):
+                    a -= 1
+                    full_profile[i] = full_profile[a]
+
+    # Création de la spline
+    spline = CubicSpline(X, full_profile)
+
+    # Création de la fonction dérivée
+    spline_derivative = spline.derivative(nu=2)
+
+    # Évaluation de la fonction et de sa dérivée
+    y_interp = spline(X)
+    dy_dx = spline_derivative(X)
+
+    # Tracé
+    plt.figure(figsize=(10, 5))
+    plt.plot(X, full_profile, 'o', label='Points d\'origine')
+    plt.plot(X, y_interp, '-', label='Interpolation (fonction f)')
+    plt.title('Fonction f(x)')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.grid(True)
+    plt.legend()
+    # plt.show()
+    plt.close()
+
+    return dy_dx
+
+
+def trouver_point_droite(points, point_min):
+    i = point_min
+    descente_trouvee = False
+    for j in range(i + 1, len(points) - 1):
+        if points[j] < points[j - 1]:
+            descente_trouvee = True
+        elif descente_trouvee and points[j] > points[j - 1]:
+            return j  # Premier point après la descente où ça remonte
+    return len(points) - 2  # Si rien trouvé, retourne l'avant-dernier point
+
+
+def trouver_point_gauche(points, point_min):
+    i = point_min
+    descente_trouvee = False
+    for j in range(i - 1, 0, -1):
+        if points[j] < points[j + 1]:
+            descente_trouvee = True
+        elif descente_trouvee and points[j] > points[j + 1]:
+            return j
+    return 1
+
+
+def pseudo_floor(X, derivate, point_min):
+    index_gauche = trouver_point_gauche(derivate, point_min)
+    index_droite = trouver_point_droite(derivate, point_min)
+
+    X_gauche = X[index_gauche]
+    X_droite = X[index_droite]
+
+    return X_gauche, X_droite
+
+
+def build_save_path(zone, swirl_on_or_off, crater_id, smooth, i, suffix):
+    base_path = f'results/RG{zone}/profils/{swirl_on_or_off}/{crater_id}'
+    os.makedirs(base_path, exist_ok=True)
+    filename = f"Profil{'_smoothed' if smooth else ''}_{i * 10}_{(i + 18) * 10}{suffix}.png"
+    return os.path.join(base_path, filename)
+
+
+def plot_and_save(x_vals, y_vals, title, ylabel, label, color, marker, suffix):
+    plt.figure(figsize=(40, 15))
+    plt.plot(x_vals, y_vals, color=color, marker=marker, label=label)
+    plt.xlabel("Distance (m)")
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(build_save_path(zone, swirl_on_or_off, crater_id, smooth, i, suffix))
+    plt.close()
+
 
 def save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
-                          alt_points_inner_20, alt_points_inner_30, full_profile_source):
+                          alt_points_inner_20, alt_points_inner_30, full_profile_source,
+                          smooth, delimitation_graph=None):
     '''
-    Cette fonction trace et sauvegarde les profils avec points spécifiques.
+    Trace et sauvegarde les profils topographiques avec leur dérivée seconde.
 
-    Entrées :
-        full_profile: list            -- Profil d'altitude complet
-        X: list                       -- Distance cumulée en mètres
+    Paramètres :
+        full_profile: list            -- Profil d'altitude (lissé ou non)
+        X: list                       -- Distances en mètres
         i: int                        -- Index du profil
         zone: str                     -- Zone d'étude
         crater_id: int                -- ID du cratère
-        swirl_on_or_off: str          -- 'on-swirl' ou 'off-swirl'
-        alt_points_inner_20: list     -- Liste de paires [min, max] pour inner_20
-        alt_points_inner_30: list     -- Liste de paires [min, max] pour inner_30
-        full_profile_source: list     -- Profil brut pour retrouver les altitudes
+        swirl_on_or_off: str         -- 'on-swirl' ou 'off-swirl'
+        alt_points_inner_20: list    -- Points [min, max] pour inner_20
+        alt_points_inner_30: list    -- Points [min, max] pour inner_30
+        full_profile_source: list    -- Profil brut
+        smooth: bool                 -- Indique si le profil est lissé
+        delimitation_graph: list    -- Indices de découpage pour les profils lissés
 
-    Sortie :
-        path: str                     -- Dossier de sauvegarde
+    Retour :
+        path: str                     -- Chemin du dossier de sauvegarde
+        indices_30: list             -- Indices associés à inner_30
     '''
 
-    plt.figure(figsize=(40, 15))
-    plt.plot(X, full_profile, marker='x', label='Profil topographique')
-    plt.xlabel("Distance (m)")
-    plt.ylabel("Altitude")
-    plt.title(f'Profil topographique pour les angles {i * 10}° et {(i + 18) * 10}°')
-    plt.grid(True)
+    if not smooth:
+        indices_20 = find_alt_point_indices(full_profile_source, alt_points_inner_20)
+        indices_30 = find_alt_point_indices(full_profile_source, alt_points_inner_30)
 
-    # Trouver les indices des altitudes spécifiques
-    indices_20 = find_alt_point_indices(full_profile_source, alt_points_inner_20)
-    indices_30 = find_alt_point_indices(full_profile_source, alt_points_inner_30)
 
-    # Tracer les points spécifiques
-    for idx in indices_20:
-        if idx < len(X):
-            plt.scatter(X[idx], full_profile[idx], color='red', zorder=5)
+        if len(indices_20) >= 3:
+            start_idx = indices_20[0]
+            end_idx = indices_20[2]
+        else:
+            # Fallback sécurisé
+            start_idx = indices_20[0]
+            end_idx = indices_20[1]
 
-    for idx in indices_30:
-        if idx < len(X):
-            plt.scatter(X[idx], full_profile[idx], color='blue', zorder=5)
+        plt.figure(figsize=(40, 15))
 
-    # Ajouter la légende des points si nécessaire
-    handles = [plt.Line2D([0], [0], color='blue', marker='o', linestyle='', markersize=10, label='Inner 30'),
-               plt.Line2D([0], [0], color='red', marker='o', linestyle='', markersize=10, label='Inner 20')]
-    plt.legend(handles=handles)
+        for idx in indices_20:
+            if idx < len(X):
+                plt.scatter(X[idx], full_profile[idx], color='red', zorder=5)
+        for idx in indices_30:
+            if idx < len(X):
+                plt.scatter(X[idx], full_profile[idx], color='blue', zorder=5)
 
-    # Gestion des dossiers
-    if swirl_on_or_off == 'on-swirl':
-        path = f'results/RG{zone}/profils/on_swirl/{crater_id}'
-        save_path = os.path.join(path, f'Profil_{i * 10}_{(i + 18) * 10}.png')
+        X_slice = X[start_idx:end_idx + 1]
+        profile_slice = full_profile[start_idx:end_idx + 1]
+
+        if len(X_slice) > 2:
+
+            second_derivative = profile_derivative(profile_slice, X_slice)
+            point_min = int(np.argmin(profile_slice))
+
+            floor_left, floor_right = pseudo_floor(X_slice, second_derivative, point_min)
+
+            index_left = int(np.where(X == floor_left)[0])
+            index_right = int(np.where(X == floor_right)[0])
+
+            plt.scatter(X[index_left], full_profile[index_left], color='orange', zorder=5)
+            plt.scatter(X[index_right], full_profile[index_right], color='orange', zorder=5)
+            plt.plot(X, full_profile, color='blue', marker='x', label='Profil topographique')
+            plt.xlabel("Distance (m)")
+            plt.ylabel("Altitude")
+            plt.title(f'Profil topographique pour les angles {i * 10}° à {(i + 18) * 10}°')
+            plt.grid(True)
+
+            legend_elements = [
+                plt.Line2D([0], [0], color='blue', marker='o', linestyle='', label='Inner 30', markersize=10),
+                plt.Line2D([0], [0], color='red', marker='o', linestyle='', label='Inner 20', markersize=10),
+                plt.Line2D([0], [0], color='orange', marker='o', linestyle='', label='Floor delimitation', markersize=10)
+            ]
+            plt.legend(handles=legend_elements)
+
+            # Sauvegarde profil
+            plt.savefig(build_save_path(zone, swirl_on_or_off, crater_id, smooth, i, suffix=""))
+            plt.close()
+
+            index_left = int(np.where(X_slice == floor_left)[0])
+            index_right = int(np.where(X_slice == floor_right)[0])
+
+            plt.figure(figsize=(40, 15))
+            plt.scatter(X_slice[index_left], second_derivative[index_left], color='green', zorder=5)
+            plt.scatter(X_slice[index_right], second_derivative[index_right], color='green', zorder=5)
+            plt.plot(X_slice, second_derivative, color='red', label='Seconde dérivée')
+            plt.scatter(X_slice, second_derivative, color='red', s=80)  # Montre tous les points
+            plt.xlabel("Distance (m)")
+            plt.ylabel("Seconde dérivée")
+            plt.title(f'Dérivée seconde pour les angles {i * 10}° à {(i + 18) * 10}°')
+            plt.grid(True)
+            plt.legend()
+
+            # Sauvegarde dérivée seconde
+            plt.savefig(build_save_path(zone, swirl_on_or_off, crater_id, smooth, i, "_second_derivative"))
+            plt.close()
+
+        else:
+            plt.plot(X, full_profile, color='blue', marker='x', label='Profil topographique')
+            plt.xlabel("Distance (m)")
+            plt.ylabel("Altitude")
+            plt.title(f'Profil topographique pour les angles {i * 10}° à {(i + 18) * 10}°')
+            plt.grid(True)
+
+            legend_elements = [
+                plt.Line2D([0], [0], color='blue', marker='o', linestyle='', label='Inner 30', markersize=10),
+                plt.Line2D([0], [0], color='red', marker='o', linestyle='', label='Inner 20', markersize=10),
+                plt.Line2D([0], [0], color='green', marker='o', linestyle='', label='Floor delimitation', markersize=10)
+            ]
+            plt.legend(handles=legend_elements)
+
+            # Sauvegarde profil
+            plt.savefig(build_save_path(zone, swirl_on_or_off, crater_id, smooth, i, suffix=""))
+            plt.close()
+
+            print(f"id du cratère: {crater_id}")
+            print(f"Angle: {i*10}")
+            print(f"X: {X}")
+            print(f"X entre les deux points de 20%: {X_slice}")
+
+        return f'results/RG{zone}/profils/{swirl_on_or_off}/{crater_id}', indices_20
+
     else:
-        path = f'results/RG{zone}/profils/off_swirl/{crater_id}'
-        save_path = os.path.join(path, f'Profil_{i * 10}_{(i + 18) * 10}.png')
+        # Profil lissé
 
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    plt.savefig(save_path)
-    plt.close()
+        plot_and_save(X, full_profile,
+                      "Lissage du profil topographique",
+                      "Altitude", "Profil original", "blue", "", "")
 
-    return path
+        # Dérivée seconde sur portion délimitée
+        X_slice = X[delimitation_graph[0]:delimitation_graph[2]]
+        profile_slice = full_profile[delimitation_graph[0]:delimitation_graph[2]]
+        second_derivative = profile_derivative(profile_slice, X_slice)
 
+        plot_and_save(X_slice, second_derivative,
+                      f'Dérivée seconde issue du profil lissé pour les angles {i * 10}° à {(i + 18) * 10}°',
+                      "Altitude", "Seconde dérivée", "red", "o", "_second_derivative")
 
+        return f'results/RG{zone}/profils/{swirl_on_or_off}/{crater_id}', None
 
 
 def adjust_profile_length(profil_individuel, min_X, limit_profil):
@@ -210,7 +382,6 @@ def adjust_profile_length(profil_individuel, min_X, limit_profil):
     return profil_individuel
 
 
-
 def calculate_average_profile(all_profiles, min_X):
     '''
     This fuction calculate the average profile by averaging values at each distance.
@@ -231,7 +402,6 @@ def calculate_average_profile(all_profiles, min_X):
         profil_moyen.append(np.mean(colonne_i))
 
     return profil_moyen
-
 
 
 def save_average_profile(profil_moyen, min_X, path):
@@ -258,6 +428,41 @@ def save_average_profile(profil_moyen, min_X, path):
     plt.savefig(path + "/Profil_moyen.png")
     plt.close()
 
+
+def smooth_profile(y):
+    y = np.asarray(y)
+
+    window_length = min(21, len(y) - 1)
+
+    if window_length % 2 == 0:
+        window_length -= 1
+
+    polyorder = 2
+
+    if np.any(np.isnan(y)) or np.any(np.isinf(y)):
+        index_nan = np.where(np.isnan(y))
+
+        for i in index_nan[0]:
+            a = i
+            if i < len(y) / 2:
+                while np.isnan(y[i]):
+                    a += 1
+                    y[i] = y[a]
+            else:
+                while np.isnan(y[i]):
+                    a -= 1
+                    y[i] = y[a]
+
+    if len(y) < window_length:
+        window_length = len(y) if len(y) % 2 != 0 else len(y) - 1
+        if window_length < polyorder + 2:
+            raise ValueError(f"Taille de y trop petite ({len(y)}) pour appliquer un filtre de Savitzky-Golay")
+
+    polyorder = min(polyorder, window_length - 1)
+
+    y_smooth = savgol_filter(y, window_length=window_length, polyorder=polyorder)
+
+    return y_smooth
 
 
 def main(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, swirl_on_or_off, zone, crater_id, 
@@ -288,20 +493,21 @@ def main(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, swirl
 
         # Store the profile
         all_profiles.append(full_profile)
-        
-        print(len(alt_point_inner_30))
 
         alt_20 = [alt_points_inner_20[i], alt_points_inner_20[i + 18]]
         alt_30 = [alt_point_inner_30[i], alt_point_inner_30[i + 18]]
     
         full_profile_source = demi_profils_value[i][::-1][:-1] + demi_profils_value[i + 18]
     
-        path = save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
-                                     alt_20, alt_30,
-                                     full_profile_source)
+        path, indices_20 = save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
+                                                 alt_20, alt_30, full_profile_source, smooth=False)
 
+        """
+        full_profile_smooth = smooth_profile(full_profile)
 
-    
+        save_and_plot_profile(full_profile_smooth, X, i, zone, crater_id, swirl_on_or_off, alt_20, alt_30,
+                              full_profile_source, smooth=True, delimitation_graph=indices_20)
+        """
 
     # Adapt profiles for future averaging
     for profil_individuel in all_profiles:
@@ -312,7 +518,6 @@ def main(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, swirl
 
     # Save and plot the average profile
     save_average_profile(profil_moyen, min_X, path=path)
-
 
 
 def visualisation3d (masked_image, crater_id, zone, swirl_on_or_off):
@@ -329,12 +534,8 @@ def visualisation3d (masked_image, crater_id, zone, swirl_on_or_off):
 
     ax.set_title(f'Visualisation 3D du crater {crater_id} de RG{zone}')
 
-    if swirl_on_or_off == 'on-swirl':
-        path = f'results/RG{zone}/profils/on_swirl/{crater_id}'
-        save_path = os.path.join(path, f'Representation_3d_{crater_id}.png')
-    else:
-        path = f'results/RG{zone}/profils/off_swirl/{crater_id}'
-        save_path = os.path.join(path, f'Representation_3d_{crater_id}.png')
+    path = f'results/RG{zone}/profils/{swirl_on_or_off}/{crater_id}'
+    save_path = os.path.join(path, f'Representation_3d_{crater_id}.png')
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 

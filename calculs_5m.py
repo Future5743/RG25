@@ -23,7 +23,7 @@ from Topographical_profiles import main, visualisation3d
 ##################################################### DATA OPENING #####################################################
 ########################################################################################################################
 
-zones = ['7']
+zones = ['2', '7']
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 zone_settings = {
@@ -49,7 +49,7 @@ for zone in zones:
 
     # Path for data
     crater_shapefile_path = os.path.join('data', 'Buffer_crateres', f'Buffer_RG{zone}')
-    raster_path = os.path.join('..', 'data', 'RG', f'NAC_DTM_REINER{zone}.TIF')
+    raster_path = os.path.join('..', 'data', 'RG', f'NAC_DTM_REINER{zone}.tiff')
     hiesinger_path = os.path.join('data', 'HIESINGER2011_MARE_AGE_UNITS_180', 'HIESINGER2011_MARE_AGE_UNITS_180.SHP')
     swirls_path = os.path.join('data', 'Swirl', 'REINER_GAMMA.shp')
 
