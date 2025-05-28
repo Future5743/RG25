@@ -503,8 +503,8 @@ def slope_uncertainties(uncertainty_slope, point_1, point_2, dist, pixel_size, d
     uncertainty_slope.append(round(delta_slope, 2))
 
 
-def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives, depth, min_val, pixel_size, dz,
-                              out_transform, no_data_value, rate):
+def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives, point_inner, idx_inner, crater_floor, pixel_size, dz,
+                              out_transform, no_data_value,):
     '''
     This function compute the crater's slopes with the method used in Stopar et al., 2017.
 
@@ -551,7 +551,6 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
     uncertainty_slope_px_to_px = []
 
     geom = []
-    alt_points_inner = []
 
     for i, (profil_coords, profil_values) in enumerate(zip(demi_profils_coords_relatives, demi_profils_value)):
 
@@ -563,61 +562,17 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
         profil_values_clean = profil_values_clean[~np.isnan(profil_values_clean)]
         min_val_profil = np.min(profil_values_clean)
 
-        alt_min = rate * depth[i] + min_val
-        alt_max = (1 - rate) * depth[i] + min_val
-
-        point_inner_min = point_inner_max = None
-        index_min_inner = index_max_inner = -1
-        min_dist_min = min_dist_max = np.inf
-
-        for j, (_, _, z) in enumerate(demi_profil):
-            if np.isnan(z):
-                continue
-            if abs(z - alt_min) < min_dist_min:
-                min_dist_min = abs(z - alt_min)
-                point_inner_min = demi_profil[j]
-                index_min_inner = j
-            if abs(z - alt_max) < min_dist_max:
-                min_dist_max = abs(z - alt_max)
-                point_inner_max = demi_profil[j]
-                index_max_inner = j
-
-        # S'assurer de l'ordre
-        if index_min_inner > index_max_inner:
-            index_min_inner, index_max_inner = index_max_inner, index_min_inner
-            point_inner_min, point_inner_max = point_inner_max, point_inner_min
-
-        # Vérifie si l’un des points est égal à la valeur minimale brute du profil
-        if point_inner_min is not None and point_inner_min[2] == min_val_profil:
-            if index_min_inner + 1 < len(demi_profil) and not np.isnan(demi_profil[index_min_inner + 1][2]):
-                point_inner_min = demi_profil[index_min_inner + 1]
-            elif index_min_inner - 1 >= 0 and not np.isnan(demi_profil[index_min_inner - 1][2]):
-                point_inner_min = demi_profil[index_min_inner - 1]
-
-        if point_inner_max is not None and point_inner_max[2] == min_val_profil:
-            if index_max_inner + 1 < len(demi_profil) and not np.isnan(demi_profil[index_max_inner + 1][2]):
-                point_inner_max = demi_profil[index_max_inner + 1]
-            elif index_max_inner - 1 >= 0 and not np.isnan(demi_profil[index_max_inner - 1][2]):
-                point_inner_max = demi_profil[index_max_inner - 1]
-
-        if point_inner_min is None or point_inner_max is None:
-            print(f"Profil {i}: point_inner_min ou point_inner_max est None")
-            slopes_px_to_px.append(np.nan)
-            slopes.append(np.nan)
-            geom.append(None)
-            alt_points_inner.append([np.nan, np.nan])  # Toujours deux valeurs
-            continue
-
-        alt_points_inner.append([point_inner_min[2], point_inner_max[2]])
-
         # Calculs des pentes...
-        slopes_point_inner_max_inner_min(slopes, uncertainty_slope, i, point_inner_min, point_inner_max, pixel_size, dz)
+        help_please_jpp = [profil_coords[0][crater_floor[i]], profil_coords[1][crater_floor[i]], profil_values[crater_floor[i]]]
+
+        slopes_point_inner_max_inner_min(slopes, uncertainty_slope, i, help_please_jpp, point_inner[i][1], pixel_size, dz)
 
         # Calcul des pentes px à px
         s = []
         s_uncertainties = []
 
-        mean_slope_px, mean_uncertainty = slopes_px2px(s, s_uncertainties, index_min_inner, index_max_inner,
+
+        mean_slope_px, mean_uncertainty = slopes_px2px(s, s_uncertainties, crater_floor[i], idx_inner[i][1],
                                                        demi_profil, pixel_size, dz)
 
         slopes_px_to_px.append(mean_slope_px)
@@ -625,9 +580,9 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
 
         # Construction géométrie
         geom.append(LineString([
-            rasterio.transform.xy(out_transform, point_inner_min[0], point_inner_min[1]),
-            rasterio.transform.xy(out_transform, point_inner_max[0], point_inner_max[1])
+            rasterio.transform.xy(out_transform, point_inner[i][0][0], point_inner[i][0][1]),
+            rasterio.transform.xy(out_transform, point_inner[i][1][0], point_inner[i][1][1])
         ]))
 
     return slopes, slopes_px_to_px, geom, round(np.mean(slopes), 2), round(np.mean(slopes_px_to_px), 2), \
-           uncertainty_slope, uncertainty_slope_px_to_px, alt_points_inner
+           uncertainty_slope, uncertainty_slope_px_to_px

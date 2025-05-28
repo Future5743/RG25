@@ -413,7 +413,7 @@ for zone in zones:
                             '''
 
                             ### --- SLOPES CALCULATION --- ###
-
+                            """
                             slopes_PCA, mean_slope_PCA, delta_PCA = slope_calculation_by_PCA(demi_profiles_value,
                                                                                              demi_profiles_coords_relatives,
                                                                                              index_maximum,
@@ -422,7 +422,7 @@ for zone in zones:
                                                                                              precision_error,
                                                                                              n_simulations=100,
                                                                                              visualize=False)
-                            """
+                            
                             inner_slopes_deg, inner_slopes_delimitation = [], []
 
                             mean_inner_slope = inner_slopes(inner_slopes_deg,
@@ -433,6 +433,16 @@ for zone in zones:
                                                             out_transform, index_maximum,
                                                             pixel_size_tb, precision_error)
                             """
+
+                            # visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
+                            
+                            ### --- CREATING TOPOGRAPHIC PROFILES --- ###
+
+                            crater_floor, point_inner, idx_inner = main(demi_profiles_value,
+                                                                        demi_profiles_coords_relatives,
+                                                                        pixel_size_tb, swirl_on_or_off, zone, crater_id,
+                                                                        no_data_value, depth, min_val)
+
                             (
                                 slopes_stopar_20,
                                 slopes_px2px_20,
@@ -440,51 +450,22 @@ for zone in zones:
                                 mean_slope_stopar_20,
                                 mean_slope_px2px_20,
                                 delta_stopar_20,
-                                delta_stopar_px2px_20,
-                                alt_points_inner_20
+                                delta_stopar_px2px_20
                             ) = slopes_stopar_calculation(
                                 demi_profiles_value,
                                 demi_profiles_coords_relatives,
-                                depth,
-                                min_val,
+                                point_inner,
+                                idx_inner,
+                                crater_floor,
                                 pixel_size_tb,
                                 precision_error,
                                 out_transform,
-                                no_data_value,
-                                rate=0.2
+                                no_data_value
                             )
-
-                            (
-                                slopes_stopar_30,
-                                slopes_px2px_30,
-                                slopes_stopar_geom_30,
-                                mean_slope_stopar_30,
-                                mean_slope_px2px_30,
-                                delta_stopar_30,
-                                delta_stopar_px2px_30,
-                                alt_points_inner_30
-                            ) = slopes_stopar_calculation(
-                                demi_profiles_value,
-                                demi_profiles_coords_relatives,
-                                depth,
-                                min_val,
-                                pixel_size_tb,
-                                precision_error,
-                                out_transform,
-                                no_data_value,
-                                rate=0.3
-                            )
-
-                            visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
-                            
-                            ### --- CREATING TOPOGRAPHIC PROFILES --- ###
-
-                            main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swirl_on_or_off,
-                                 zone, crater_id, alt_points_inner_20, alt_points_inner_30)
 
                             ### --- TRI ALGORITHM --- ###
-                            TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
-                                craters.crs)
+                            #TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
+                            #    craters.crs)
 
                             # Commune attributes
                             common_attrs = {
@@ -499,9 +480,9 @@ for zone in zones:
                                     'geometry': geom,
                                     **common_attrs,
                                     'position': f'Ligne à {angle}°',
-                                    'slopesPCA': slopes_PCA[i],
-                                    'δ_PCA': delta_PCA[i],
-                                    'meanPCA': mean_slope_PCA
+                                    #'slopesPCA': slopes_PCA[i],
+                                    #'δ_PCA': delta_PCA[i],
+                                    #'meanPCA': mean_slope_PCA
                                 })
 
                                 highest_points.append({
@@ -538,18 +519,6 @@ for zone in zones:
                                     'δ_px2px': delta_stopar_px2px_20[i],
                                     'mean_slope': mean_slope_stopar_20,
                                     'meanPX2PX': mean_slope_px2px_20
-                                })
-
-                                results_slopes_stopar_30.append({
-                                    'geometry': slopes_stopar_geom_30[i],
-                                    **common_attrs,
-                                    'position': f'Ligne à {angle}°',
-                                    'slope': slopes_stopar_30[i],
-                                    'δ_slope': delta_stopar_30[i],
-                                    'slopePX2PX': slopes_px2px_30[i],
-                                    'δ_px2px': delta_stopar_px2px_30[i],
-                                    'mean_slope': mean_slope_stopar_30,
-                                    'meanPX2PX': mean_slope_px2px_30
                                 })
 
                                 angle += 10
@@ -640,8 +609,7 @@ for zone in zones:
         (centers,                       f'results_geom_centers_RG{zone}'),
         (rim_approx,                    f'results_geom_rim_RG{zone}'),
         # (inner_slopes_results,          f'results_geom_slopes_RG{zone}'),
-        (results_slopes_stopar_20,      f'results_geom_slopes_stopar_20_RG{zone}'),
-        (results_slopes_stopar_30,      f'results_geom_slopes_stopar_30_RG{zone}')
+        (results_slopes_stopar_20,      f'results_geom_slopes_stopar_20_RG{zone}')
     ]
     # Création et export des GeoDataFrames
     for data, filename in shapefile_data:
