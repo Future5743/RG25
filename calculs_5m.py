@@ -513,12 +513,12 @@ for zone in zones:
                                     'geometry': slopes_stopar_geom_20[i],
                                     **common_attrs,
                                     'position': f'Ligne à {angle}°',
-                                    'slope': slopes_stopar_20[i],
-                                    'δ_slope': delta_stopar_20[i],
-                                    'slopePX2PX': slopes_px2px_20[i],
-                                    'δ_px2px': delta_stopar_px2px_20[i],
-                                    'mean_slope': mean_slope_stopar_20,
-                                    'meanPX2PX': mean_slope_px2px_20
+                                    'slopeCalas': slopes_stopar_20[i],
+                                    'δCalas': delta_stopar_20[i],
+                                    'slopeStopar': slopes_px2px_20[i],
+                                    'δStopar': delta_stopar_px2px_20[i],
+                                    'meanCalas': mean_slope_stopar_20,
+                                    'meanStopar': mean_slope_px2px_20
                                 })
 
                                 angle += 10
