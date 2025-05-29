@@ -261,10 +261,6 @@ def plot_and_save(x_vals, y_vals, title, ylabel, label, color, marker, suffix):
 def save_and_plot_profile(full_profile, X, i, limit_profil, zone, crater_id, swirl_on_or_off,
                           alt_points_inner_20, full_profile_source,
                           smooth=False):
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from matplotlib.widgets import Button
-    import os
 
     def build_save_path(zone, swirl_on_or_off, crater_id, smooth, i, suffix):
         base_path = f'results/RG{zone}/profils/{swirl_on_or_off}/{crater_id}'
@@ -299,8 +295,6 @@ def save_and_plot_profile(full_profile, X, i, limit_profil, zone, crater_id, swi
 
     # ---------------- MÉTHODE INTERACTIVE ----------------
     if X[-1] >= 400:
-        smooth = True
-        print(f"Le profil du cratère {crater_id} à l'angle {i * 10} a été lissé")
 
         selected_points = []
         selected_indices = []

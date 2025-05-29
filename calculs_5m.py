@@ -413,7 +413,7 @@ for zone in zones:
                             '''
 
                             ### --- SLOPES CALCULATION --- ###
-                            """
+
                             slopes_PCA, mean_slope_PCA, delta_PCA = slope_calculation_by_PCA(demi_profiles_value,
                                                                                              demi_profiles_coords_relatives,
                                                                                              index_maximum,
@@ -422,7 +422,7 @@ for zone in zones:
                                                                                              precision_error,
                                                                                              n_simulations=100,
                                                                                              visualize=False)
-                            
+                            """
                             inner_slopes_deg, inner_slopes_delimitation = [], []
 
                             mean_inner_slope = inner_slopes(inner_slopes_deg,
@@ -434,7 +434,7 @@ for zone in zones:
                                                             pixel_size_tb, precision_error)
                             """
 
-                            # visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
+                            visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
                             
                             ### --- CREATING TOPOGRAPHIC PROFILES --- ###
 
@@ -464,8 +464,8 @@ for zone in zones:
                             )
 
                             ### --- TRI ALGORITHM --- ###
-                            #TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
-                            #    craters.crs)
+                            TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
+                                craters.crs)
 
                             # Commune attributes
                             common_attrs = {
@@ -480,9 +480,9 @@ for zone in zones:
                                     'geometry': geom,
                                     **common_attrs,
                                     'position': f'Ligne à {angle}°',
-                                    #'slopesPCA': slopes_PCA[i],
-                                    #'δ_PCA': delta_PCA[i],
-                                    #'meanPCA': mean_slope_PCA
+                                    'slopesPCA': slopes_PCA[i],
+                                    'δ_PCA': delta_PCA[i],
+                                    'meanPCA': mean_slope_PCA
                                 })
 
                                 highest_points.append({
