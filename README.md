@@ -5,17 +5,20 @@ This code was developped with python 3.12.7
 
 ### Libraries
 The following libraries are required to ensure that the code functions correctly. The written versions are those used during code development.
-| Libraries | Version| Documentation|
-|:-----------|:--------|:-----------|
-| geopandas | v1.0.1 | https://geopandas.org/en/stable/docs.html|
-| matplotlib | v3.10.0 | https://matplotlib.org/stable/index.html|
-| numpy | v1.26.4 | https://numpy.org/doc/1.26/ |
+
+| Libraries | Version| Documentation                                        |
+|:-----------|:--------|:-----------------------------------------------------|
+| geopandas | v1.0.1 | https://geopandas.org/en/stable/docs.html            |
+| matplotlib | v3.10.0 | https://matplotlib.org/stable/index.html             |
+| numpy | v1.26.4 | https://numpy.org/doc/1.26/                          |
 | rasterio | v1.4.3 | https://rasterio.readthedocs.io/en/latest/index.html |
 | shapely | v2.0.6 | https://shapely.readthedocs.io/en/stable/manual.html |
-| tqdm | v4.67.1 | https://pypi.org/project/tqdm/ |
-| scikit-learn | v1.5.1 | https://scikit-learn.org/stable/index.html |
-| scikit-image | v0.25.0 | https://scikit-image.org/docs/stable/ |
-| scipy | v1.13.1 | https://docs.scipy.org/doc//scipy/index.html |
+| tqdm | v4.67.1 | https://pypi.org/project/tqdm/                       |
+| scikit-learn | v1.5.1 | https://scikit-learn.org/stable/index.html           |
+| scikit-image | v0.25.0 | https://scikit-image.org/docs/stable/                |
+| scipy | v1.13.1 | https://docs.scipy.org/doc//scipy/index.html         |
+| tkinter | | https://docs.python.org/3/library/tkinter.html       |
+| reportlab | | https://pypi.org/project/reportlab/                  |
 
 ### Exterior data required
 To use correctly the code, you need to download some extra data from the [LROC website](https://wms.lroc.asu.edu/lroc/rdr_product_select?filter%5Btext%5D=rein&filter%5Blat%5D=&filter%5Blon%5D=&filter%5Brad%5D=&filter%5Bwest%5D=&filter%5Beast%5D=&filter%5Bsouth%5D=&filter%5Bnorth%5D=&filter%5Bprefix%5D%5B%5D=NAC_DTM&show_thumbs=0&per_page=10&commit=Search).
@@ -46,6 +49,7 @@ Here is an example of this data organization:
     └──💾NAC_DTM_REINER7.tiff
 📁 RG25 (This repository)
 ├── 📁 data
+├── 📁 logo
 ├── 📁 results
 ├── 🐍Circularity.py
 ├── 🐍Graph_dtoD.py
@@ -54,7 +58,7 @@ Here is an example of this data organization:
 ├── 🐍Slopes.py
 ├── 🐍TRI.py
 ├── 🐍Topographical_profiles.py
-└── 🐍calculs_5m.py
+└── 🐍main.py
 ```
 
 ⚠️ If you adopt a different data organization structure, please change the paths in calculs_5m.py.
@@ -77,13 +81,17 @@ This repository is organized following this structure:
 
 📁 results -- This folder contains all the results of the python scripts  
 ├── 📁 RG2 -- This folder contains the results of RG2  
+│   ├── 📁 crater_img -- This folder contains images of the DEM of the craters
 │   ├── 📁 profils -- This folder contains the craters profiles of RG2  
 │   │   ├── 📁 on-swirl -- This folder contains the profiles of the crater in the on-swirl zone  
 │   │   └── 📁 off-swirl -- This folder contains the profiles of the crater in the off-swirl zone  
 │   │       └── 📁 id -- This folder contains the profiles of the crater of a specific id  
+│   ├── 📁 rapport -- This folder contains reports on the craters studied of RG2
 │   └── 📁 TRI -- This folder contains the TRI images of the craters of RG2  
 └── 📁 RG7 -- This folder contains results of RG7  
+    ├── 📁 crater_img -- This folder contains images of the DEM of the craters
     ├── 📁 profils -- This folder contains the craters profiles of RG7  
+    ├── 📁 rapport -- This folder contains reports on the craters studied of RG7
     └── 📁 TRI -- This folder contains the TRI images of the craters of RG7  
 
 ```
@@ -91,12 +99,12 @@ This repository is organized following this structure:
 ### Python scripts
 This are the python files of this repository and their function. The calculs_5m.py is the "main" of this repository : you need to run it to compute your data.
 
-| Pyhton files |  Description |
-|:-------------|:-------------|
-|🐍Circularity.py | This script calculates the circularity of craters |
-|🐍Graph_dtoD.py | This script generates graphs showing d/D versus diameter with uncertainties |
-|🐍Maximum_search.py | This script finds the altitude maxima for each profile every 10° |
-|🐍Slopes.py | This script finds crater slopes |
-|🐍TRI.py | This script calculates the TRI index and saves it as an image |
-|🐍Topographical_profiles.py | This script draws profiles every 10° and the average crater profile |
-|🐍calculs_5m.py | This script is used to process the craters by calling the preceding scripts |
+| Pyhton files                |  Description |
+|:----------------------------|:-------------|
+| 🐍Circularity.py            | This script calculates the circularity of craters |
+| 🐍Graph_dtoD.py             | This script generates graphs showing d/D versus diameter with uncertainties |
+| 🐍Maximum_search.py         | This script finds the altitude maxima for each profile every 10° |
+| 🐍Slopes.py                 | This script finds crater slopes |
+| 🐍TRI.py                    | This script calculates the TRI index and saves it as an image |
+| 🐍Topographical_profiles.py | This script draws profiles every 10° and the average crater profile |
+| 🐍main.py                   | This script is used to process the craters by calling the preceding scripts |
