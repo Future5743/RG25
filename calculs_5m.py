@@ -17,13 +17,14 @@ from Circularity import Miller_index
 from Slopes import max_crater_slopes_calculation, slope_calculation_by_PCA, inner_slopes, slopes_stopar_calculation
 from TRI import TRI
 from Topographical_profiles import main, visualisation3d
+from pdf_report import creer_rapport_cratere
 
 
 ########################################################################################################################
 ##################################################### DATA OPENING #####################################################
 ########################################################################################################################
 
-zones = ['2', '7']
+zones = ['7']
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 zone_settings = {
@@ -116,6 +117,12 @@ for zone in zones:
     if os.path.exists(f"results/RG{zone}/TRI"):
         try:
             shutil.rmtree("results/RG" + zone + "/TRI")
+        except OSError as e:
+            print(f"Error: {e.strerror}")
+
+    if os.path.exists(f"results/RG{zone}/crater_img"):
+        try:
+            shutil.rmtree("results/RG" + zone + "/crater_img")
         except OSError as e:
             print(f"Error: {e.strerror}")
 
@@ -278,11 +285,13 @@ for zone in zones:
                     circularity = Miller_index(min_pos, max_coord_relative, pixel_size_tb)
                     circularity = round(circularity, 2)
 
-                    if 0.98 <= circularity <= 1:
+                    if 0.90 <= circularity <= 1:
 
                         ### --- SLOPES --- ###
 
                         max_slope_crater = max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size_tb)
+
+                        print(f"Pentes maximale entre deux points opposés sur la crête du cratère: {max_slope_crater}")
 
                         if max_slope_crater < 8:
 
@@ -438,7 +447,7 @@ for zone in zones:
                             
                             ### --- CREATING TOPOGRAPHIC PROFILES --- ###
 
-                            crater_floor, point_inner, idx_inner = main(demi_profiles_value,
+                            crater_floor, point_inner, idx_inner, crater_morph = main(demi_profiles_value,
                                                                         demi_profiles_coords_relatives,
                                                                         pixel_size_tb, swirl_on_or_off, zone, crater_id,
                                                                         no_data_value, depth, min_val)
@@ -466,6 +475,29 @@ for zone in zones:
                             ### --- TRI ALGORITHM --- ###
                             TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
                                 craters.crs)
+
+                            ### --- RAPORT --- ###
+                            creer_rapport_cratere(crater_id,
+                                                  zone,
+                                                  swirl_on_or_off,
+                                                  crater_morph,
+                                                  center_x,
+                                                  center_y,
+                                                  lowest_point_coord,
+                                                  int(moy_diam),
+                                                  round(delta_D_hoover, 0),
+                                                  round(delta_Dbarre_stopar, 0),
+                                                  round(prof_moyen_crat, 1),
+                                                  round(delta_d_stopar, 1),
+                                                  round(delta_d_hoover, 1),
+                                                  ratio_dD,
+                                                  delta_dD_stopar,
+                                                  delta_dD_hoover,
+                                                  circularity,
+                                                  mean_slope_px2px_20,
+                                                  slopes_px2px_20,
+                                                  delta_stopar_px2px_20
+                                                  )
 
                             # Commune attributes
                             common_attrs = {
@@ -549,6 +581,7 @@ for zone in zones:
                             result_geom_select_crat.append({
                                 'geometry': buf_diam_max,
                                 **common_attrs,
+                                "morphology": crater_morph,
                                 'center_lon': center_x,
                                 'center_lat': center_y,
                                 'ray_maxdia': ray_largest_diam,

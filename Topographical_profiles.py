@@ -2,7 +2,6 @@
 ##################################################### IMPORTATIONS #####################################################
 ########################################################################################################################
 import matplotlib
-matplotlib.use('TkAgg')  # Ou 'Qt5Agg', selon ton système
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 import os
@@ -10,6 +9,8 @@ import math
 import numpy as np
 from scipy.interpolate import CubicSpline
 from scipy.signal import savgol_filter
+import tkinter as tk
+from tkinter import messagebox
 
 ########################################################################################################################
 ######################################################### CODE #########################################################
@@ -44,14 +45,13 @@ def find_alt_point_indices(profile, alt_points):
         indices: list d'indices où les altitudes correspondent
     '''
     indices = []
-    for pair in alt_points:
-        for alt in pair:
-            try:
-                idx = profile.index(alt)
-                indices.append(idx)
-            except ValueError:
-                continue  # altitude pas trouvée dans ce profil
-    return indices
+    alt_1 = alt_points[0][-1]
+    idx1 = np.where(profile == alt_1)[0]
+
+    alt_2 = alt_points[1][-1]
+    idx2 = np.where(profile == alt_2)[0]
+
+    return [int(idx1), int(idx2)]
 
 
 def calculate_cumulative_distances(coords_x, coords_y, pixel_size_tb):
@@ -92,13 +92,6 @@ def process_profile(demi_profils_value, demi_profils_coords_relatives, i, pixel_
         limit_profil: int                        -- The index just before the index of the smallest elevation value
     '''
 
-    # Retrieve and reverse the first half-profile, excluding the last point to avoid duplication
-    reversed_demi_profil = demi_profils_value[i][::-1][:-1]
-
-    limit_profil = len(reversed_demi_profil)
-
-    # Retrieve the second half-profile as-is
-    forward_demi_profil = demi_profils_value[i + 18]
 
     # Process coordinates for both halves
     x1 = demi_profils_coords_relatives[i][0][::-1][:-1]
@@ -117,12 +110,12 @@ def process_profile(demi_profils_value, demi_profils_coords_relatives, i, pixel_
     min_X = min(min_X, X, key=len)
 
     # Combine the profiles
-    full_profile = reversed_demi_profil + forward_demi_profil
+    full_profile = demi_profils_value[i][::-1][:-1] + demi_profils_value[i + 18]
 
     # Replace non-float32 values with NaN
     full_profile = [val if isinstance(val, np.float32) else np.nan for val in full_profile]
 
-    return full_profile, X, min_X, limit_profil
+    return full_profile, X, min_X
 
 
 def profile_derivative(full_profile, X):
@@ -243,7 +236,6 @@ def trouver_point_gauche(points, point_min):
     return max_idx
 
 
-
 def pseudo_floor(X, derivate, point_min):
     '''
     This function compute the potential crater floor.
@@ -292,8 +284,8 @@ def build_save_path(zone, swirl_on_or_off, crater_id, i, suffix):
     return os.path.join(base_path, filename)
 
 
-def save_and_plot_profile(full_profile, X, i, limit_profil, zone, crater_id, swirl_on_or_off,
-                          alt_points_inner_20, full_profile_source):
+def save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
+                          alt_points_inner_20):
     '''
     This function plot and save a profile and its second derivative.
     It also computes an estimation of the crater floor.
@@ -335,20 +327,24 @@ def save_and_plot_profile(full_profile, X, i, limit_profil, zone, crater_id, swi
                                                                         crater floor
     '''
 
+    limit_profil = np.where(full_profile == np.nanmin(full_profile))[0]
+
+    if len(limit_profil) > 1:
+        limit_profil = limit_profil[0]
+
+    limit_profil = int(limit_profil)
+
     def build_save_path(zone, swirl_on_or_off, crater_id, i, suffix):
         base_path = f'results/RG{zone}/profils/{swirl_on_or_off}/{crater_id}'
         os.makedirs(base_path, exist_ok=True)
         filename = f"Profil_{i * 10}_{(i + 18) * 10}{suffix}.png"
         return os.path.join(base_path, filename)
 
-    indices_20 = find_alt_point_indices(full_profile_source, alt_points_inner_20)
+    indices_20 = find_alt_point_indices(full_profile, alt_points_inner_20)
 
-    if len(indices_20) >= 3:
-        start_idx = indices_20[0]
-        end_idx = indices_20[2]
-    else:
-        start_idx = indices_20[0]
-        end_idx = indices_20[1]
+    start_idx = indices_20[0]
+    end_idx = indices_20[1]
+
 
     X_slice = X[start_idx:end_idx + 1]
     if len(X_slice) <= 2:
@@ -357,7 +353,14 @@ def save_and_plot_profile(full_profile, X, i, limit_profil, zone, crater_id, swi
     # ---------------- MÉTHODE AUTOMATIQUE ----------------
     profile_slice = full_profile[start_idx:end_idx + 1]
     second_derivative = profile_derivative(profile_slice, X_slice)
-    point_min = int(np.argmin(profile_slice))
+
+    point_min = np.where(X_slice == X[limit_profil])[0]
+
+    if len(point_min) == 1:
+        point_min = int(point_min)
+    else:
+        point_min = int(point_min[0])
+
     floor_left, floor_right = pseudo_floor(X_slice, second_derivative, point_min)
 
     index_left = int(np.argmin(np.abs(np.array(X) - floor_left)))
@@ -366,106 +369,83 @@ def save_and_plot_profile(full_profile, X, i, limit_profil, zone, crater_id, swi
     automatic_indices = [index_left, index_right]
 
     # ---------------- MÉTHODE INTERACTIVE ----------------
-    if X[-1] >= 400:
 
-        selected_points = []
-        selected_indices = []
+    selected_points = []
+    selected_indices = []
 
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.plot(X, full_profile, color='blue', marker='x', label='Profil topographique')
-        ax.set_title(f'Sélectionnez deux points pour le cratère {crater_id} (angle {i * 10}°)')
-        ax.set_xlabel("Distance (m)")
-        ax.set_ylabel("Altitude")
-        ax.grid(True)
+    fig, ax = plt.subplots(figsize=(20, 7))
+    ax.plot(X, full_profile, color='blue', marker='x', label='Profil topographique')
+    ax.set_title(f'Sélectionnez deux points pour le cratère {crater_id} (angle {i * 10}°)')
+    ax.set_xlabel("Distance (m)")
+    ax.set_ylabel("Altitude")
+    ax.grid(True)
 
-        # Affichage des points automatiques (rouges)
-        for idx in automatic_indices:
-            ax.scatter(X[idx], full_profile[idx], color='red', s=150, zorder=5)
+    # Affichage des points automatiques (rouges)
+    for idx in automatic_indices:
+        ax.scatter(X[idx], full_profile[idx], color='red', s=150, zorder=5)
 
-        def onclick(event):
-            if len(selected_points) < 2 and event.inaxes == ax:
-                idx = np.argmin(np.abs(np.array(X) - event.xdata))
-                if idx not in selected_indices:
-                    x_real = X[idx]
-                    y_real = full_profile[idx]
-                    selected_indices.append(idx)
-                    selected_points.append((x_real, y_real))
-                    ax.scatter(x_real, y_real, color='orange', s=150, zorder=10)
-                    fig.canvas.draw()
+    def onclick(event):
+        if len(selected_points) < 2 and event.inaxes == ax:
+            idx = np.argmin(np.abs(np.array(X) - event.xdata))
+            if idx not in selected_indices:
+                x_real = X[idx]
+                y_real = full_profile[idx]
+                selected_indices.append(idx)
+                selected_points.append((x_real, y_real))
+                ax.scatter(x_real, y_real, color='orange', s=150, zorder=10)
+                fig.canvas.draw()
 
-        def on_submit(event):
-            nonlocal selected_indices
+    def on_submit(event):
+        nonlocal selected_indices
 
-            # Si aucun clic → on garde les indices automatiques
-            if len(selected_indices) < 2:
-                print("Aucun point cliqué, on garde les indices automatiques :", automatic_indices)
-                selected_indices = automatic_indices
-            else:
-                print("Indices sélectionnés :", selected_indices)
+        # Si aucun clic → on garde les indices automatiques
+        if len(selected_indices) < 2:
+            print("Aucun point cliqué, on garde les indices automatiques :", automatic_indices)
+            selected_indices = automatic_indices
+        else:
+            print("Indices sélectionnés :", selected_indices)
 
-            # Profil complet final avec légende
-            fig_final, ax_final = plt.subplots(figsize=(40, 15))
+        # Profil complet final avec légende
+        fig_final, ax_final = plt.subplots(figsize=(20, 7))
 
-            for idx in indices_20:
-                if idx < len(X):
-                    ax_final.scatter(X[idx], full_profile[idx], color='red', zorder=5)
+        for idx in indices_20:
+            if idx < len(X):
+                ax_final.scatter(X[idx], full_profile[idx], color='red', zorder=5)
 
-            for idx in selected_indices:
-                ax_final.scatter(X[idx], full_profile[idx], color='orange', zorder=5)
+        for idx in selected_indices:
+            ax_final.scatter(X[idx], full_profile[idx], color='orange', zorder=5)
 
-            ax_final.plot(X, full_profile, color='blue', marker='x', label='Profil topographique')
-            ax_final.set_xlabel("Distance (m)")
-            ax_final.set_ylabel("Altitude")
-            ax_final.set_title(f'Profil topographique pour les angles {i * 10}° à {(i + 18) * 10}°')
-            ax_final.grid(True)
-            legend_elements = [
-                plt.Line2D([0], [0], color='red', marker='o', linestyle='', label='Inner 20', markersize=10),
-                plt.Line2D([0], [0], color='orange', marker='o', linestyle='', label='Floor delimitation',
-                           markersize=10)
-            ]
-            ax_final.legend(handles=legend_elements)
+        ax_final.plot(X, full_profile, color='blue', marker='x', label='Profil topographique')
+        ax_final.set_xlabel("Distance (m)")
+        ax_final.set_ylabel("Altitude")
+        ax_final.set_title(f'Profil topographique pour les angles {i * 10}° à {(i + 18) * 10}°')
+        ax_final.grid(True)
+        legend_elements = [
+            plt.Line2D([0], [0], color='red', marker='o', linestyle='', label='Inner 20', markersize=10),
+            plt.Line2D([0], [0], color='orange', marker='o', linestyle='', label='Floor delimitation',
+                       markersize=10)
+        ]
+        ax_final.legend(handles=legend_elements)
 
-            fig_final.savefig(build_save_path(zone, swirl_on_or_off, crater_id, i=i, suffix="_selection"))
-            plt.close(fig_final)
-            plt.close(fig)
+        fig_final.savefig(build_save_path(zone, swirl_on_or_off, crater_id, i=i, suffix=""))
+        plt.close(fig_final)
+        plt.close(fig)
 
-        fig.canvas.mpl_connect('button_press_event', onclick)
-        ax_button = plt.axes([0.8, 0.01, 0.1, 0.05])
-        button = Button(ax_button, 'Valider la saisie')
-        button.on_clicked(on_submit)
-        plt.show()
+    fig.canvas.mpl_connect('button_press_event', onclick)
+    ax_button = plt.axes([0.8, 0.01, 0.1, 0.05])
+    button = Button(ax_button, 'Valider la saisie')
+    button.on_clicked(on_submit)
+    plt.show()
 
-        selected_indices = sorted(selected_indices)
-
-        return limit_profil - selected_indices[0], selected_indices[1] - limit_profil
+    selected_indices = sorted(selected_indices)
 
     # ---------------- SAUVEGARDE AUTOMATIQUE ----------------
-    plt.figure(figsize=(40, 15))
-    for idx in indices_20:
-        if idx < len(X):
-            plt.scatter(X[idx], full_profile[idx], color='red', zorder=5)
-
-    plt.scatter(X[index_left], full_profile[index_left], color='orange', zorder=5)
-    plt.scatter(X[index_right], full_profile[index_right], color='orange', zorder=5)
-
-    plt.plot(X, full_profile, color='blue', marker='x', label='Profil topographique')
-    plt.xlabel("Distance (m)")
-    plt.ylabel("Altitude")
-    plt.title(f'Profil topographique pour les angles {i * 10}° à {(i + 18) * 10}°')
-    plt.grid(True)
-    legend_elements = [
-        plt.Line2D([0], [0], color='red', marker='o', linestyle='', label='Inner 20', markersize=10),
-        plt.Line2D([0], [0], color='orange', marker='o', linestyle='', label='Floor delimitation', markersize=10)
-    ]
-    plt.legend(handles=legend_elements)
-    plt.savefig(build_save_path(zone, swirl_on_or_off, crater_id, i=i, suffix=""))
-    plt.close()
 
     # Dérivée seconde
     idx_l = int(np.argmin(np.abs(X_slice - floor_left)))
     idx_r = int(np.argmin(np.abs(X_slice - floor_right)))
 
-    plt.figure(figsize=(40, 15))
+    plt.figure(figsize=(20, 7))
     plt.scatter(X_slice[idx_l], second_derivative[idx_l], color='green', zorder=5)
     plt.scatter(X_slice[idx_r], second_derivative[idx_r], color='green', zorder=5)
     plt.plot(X_slice, second_derivative, color='red', label='Seconde dérivée')
@@ -478,10 +458,10 @@ def save_and_plot_profile(full_profile, X, i, limit_profil, zone, crater_id, swi
     plt.savefig(build_save_path(zone, swirl_on_or_off, crater_id, i=i, suffix="_second_derivative"))
     plt.close()
 
-    return limit_profil - index_left, index_right - limit_profil
+    return limit_profil - selected_indices[0], selected_indices[1] - limit_profil
 
 
-def adjust_profile_length(profil_individuel, min_X, limit_profil):
+def adjust_profile_length(profil_individuel, min_X):
     '''
     This function adjust the profile length to be equal to min_X.
 
@@ -493,6 +473,13 @@ def adjust_profile_length(profil_individuel, min_X, limit_profil):
     Exit data:
         profil_individuel: list         -- Contains all the elevation of each entire profile
     '''
+    limit_profil = np.where(full_profile == np.nanmin(full_profile))[0]
+
+    if len(limit_profil) > 1:
+        limit_profil = limit_profil[0]
+
+    limit_profil = int(limit_profil)
+
     if len(profil_individuel) > len(min_X):
         excedant = len(profil_individuel) - len(min_X)
 
@@ -543,7 +530,7 @@ def save_average_profile(profil_moyen, min_X, path):
         no exit data
     '''
 
-    plt.figure(figsize=(40, 15))
+    plt.figure(figsize=(20, 7))
     plt.plot(min_X, profil_moyen, marker='x')
     plt.xlabel("Distance (m)")
     plt.ylabel("Altitude")
@@ -758,21 +745,142 @@ def process_profiles_and_plot(demi_profils_value, demi_profils_coords_relatives,
 
     min_X = [0] * 1000
     crater_floor = [0] * 36
+    fig, ax = plt.subplots(figsize=(20, 7))
+    plt.subplots_adjust(bottom=0.3)
+
+    crater_morph = None
+
+    colors = ['black', 'silver', 'red', 'saddlebrown', 'orange', 'bisque',  'gold', 'darkgoldenrod', 'yellow',
+              'greenyellow', 'green', 'lime', 'turquoise', 'blue', 'skyblue', 'purple', 'plum', 'pink']
 
     for i in range(int(len(demi_profils_value) / 2)):
-        full_profile, X, min_X, limit_profil = process_profile(
+
+        full_profile, X, min_X = process_profile(
             demi_profils_value, demi_profils_coords_relatives, i, pixel_size_tb, min_X)
 
-        alt_20 = [points_inner_20[i][0], points_inner_20[i + 18][0]]
-        full_profile_source = demi_profils_value[i][::-1][:-1] + demi_profils_value[i + 18]
+        plt.figure(figsize=(20, 7))
+        plt.plot(X, full_profile, color='b', label='Profil')
+        plt.xlabel("Distance (m)")
+        plt.ylabel("Elevation")
+        plt.title(f'Profil topographique pour les angles {i * 10}° à {(i + 18) * 10}° du cratère {crater_id}')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig(build_save_path(zone, swirl_on_or_off, crater_id, i=i, suffix=""))
+        plt.close()
 
-        idx1, idx2 = save_and_plot_profile(full_profile, X, i, limit_profil, zone, crater_id, swirl_on_or_off, alt_20,
-                                           full_profile_source)
+        limit_profil = np.where(full_profile == np.nanmin(full_profile))[0]
 
-        crater_floor[i] = idx1
-        crater_floor[i + 18] = idx2
+        if len(limit_profil) > 1:
+            limit_profil = limit_profil[0]
 
-    return crater_floor
+        limit_profil = int(limit_profil)
+
+        X_test = [indice - limit_profil for indice in range(len(X))]
+
+        def set_morph_to_Bowl(event):
+            nonlocal crater_morph
+            crater_morph = "Bowl-shaped"
+            print(f"Le cratère {crater_id} de la zone RG{zone} est un bowl-shaped.")
+            plt.close()
+
+        def set_morph_to_Flat(event):
+            nonlocal crater_morph
+            crater_morph = "Flat-floored"
+            print(f"Le cratère {crater_id} de la zone RG{zone} est un flat-floored.")
+            plt.close()
+
+        def set_morph_to_Mound(event):
+            nonlocal crater_morph
+            crater_morph = "With a mound"
+            print(f"Le cratère {crater_id} de la zone RG{zone} a un mound.")
+            plt.close()
+
+        def set_morph_to_Unknown(event):
+            nonlocal crater_morph
+            crater_morph = "Unknown"
+            print(f"Le cratère {crater_id} de la zone RG{zone} est un unknown.")
+            plt.close()
+
+        ax.plot(X_test, full_profile, color=colors[i], marker='', label='Profil topographique', linewidth=0.5)
+
+    button_axes = [
+        plt.axes([0.05 +i*0.2, 0.1, 0.15, 0.075])
+        for i in range(4)
+    ]
+
+    button1 = Button(button_axes[0], 'Bowl-shaped')
+    button2 = Button(button_axes[1], 'Flat-floored')
+    button3 = Button(button_axes[2], 'With a mound')
+    button4 = Button(button_axes[3], 'Unknown')
+
+    button1.on_clicked(set_morph_to_Bowl)
+    button2.on_clicked(set_morph_to_Flat)
+    button3.on_clicked(set_morph_to_Mound)
+    button4.on_clicked(set_morph_to_Unknown)
+
+    ax.set_title(f'Sélectionnez deux points pour le cratère {crater_id}')
+    ax.set_xlabel("Distance en point par rapport au point le plus bas")
+    ax.set_ylabel("Altitude")
+    ax.grid(True)
+    plt.show()
+
+    if crater_morph != "Bowl-shaped":
+        for i in range(int(len(demi_profils_value) / 2)):
+            full_profile, X, min_X = process_profile(
+                demi_profils_value, demi_profils_coords_relatives, i, pixel_size_tb, min_X)
+
+            alt_20 = [points_inner_20[i][0], points_inner_20[i + 18][0]]
+
+            idx1, idx2 = save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
+                                               alt_20)
+
+            crater_floor[i] = idx1
+            crater_floor[i + 18] = idx2
+
+        if crater_morph == "Unknown":
+
+            def on_oui():
+                # Afficher les boutons supplémentaires si "Oui" est pressé
+                btn_bowl.pack(pady=5)
+                btn_flat.pack(pady=5)
+                btn_mound.pack(pady=5)
+
+            def on_non():
+                root.destroy()  # Ferme la fenêtre
+
+            def on_choice(choice):
+                crater_morph = choice
+
+                if choice == "Bowl-shaped":
+                    crater_floor = [0] * 36
+                root.destroy()  # Ferme la fenêtre après le choix
+
+            # Création de la fenêtre principale
+            root = tk.Tk()
+            root.title("Choix de l'utilisateur")
+
+            # Question en haut
+            label_question = tk.Label(root, text="Avez-vous changé d'avis quant à la morphologie du cratère ?",
+                                      font=("Helvetica", 12))
+            label_question.pack(pady=15)
+
+            # Boutons "Oui" et "Non"
+            btn_oui = tk.Button(root, text="Oui", width=20, command=on_oui)
+            btn_oui.pack(pady=5)
+
+            btn_non = tk.Button(root, text="Non", width=20, command=on_non)
+            btn_non.pack(pady=5)
+
+            # Boutons supplémentaires (cachés au début)
+            btn_bowl = tk.Button(root, text="Bowl-shaped", width=20, command=lambda: on_choice("Bowl-shaped"))
+            btn_flat = tk.Button(root, text="Flat-floored", width=20, command=lambda: on_choice("Flat-floored"))
+            btn_mound = tk.Button(root, text="With a mound", width=20, command=lambda: on_choice("With a mound"))
+
+            # Lancement de la boucle principale
+            root.mainloop()
+
+    return crater_floor, crater_morph
+
 
 
 def main(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, swirl_on_or_off, zone, crater_id,
@@ -808,7 +916,7 @@ def main(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, swirl
         demi_profils_coords_relatives, demi_profils_value, no_data_value, depth, min_val
     )
 
-    crater_floor = process_profiles_and_plot(
+    crater_floor, crater_morph = process_profiles_and_plot(
         demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, points_inner_20,
         zone, crater_id, swirl_on_or_off
     )
@@ -822,7 +930,7 @@ def main(demi_profils_value, demi_profils_coords_relatives, pixel_size_tb, swirl
     # Sauvegarde du profil moyen
     # save_average_profile(profil_moyen, min_X, path=path)
 
-    return crater_floor, points_inner_20, index_inner_20
+    return crater_floor, points_inner_20, index_inner_20, crater_morph
 
 
 def visualisation3d(masked_image, crater_id, zone, swirl_on_or_off):
@@ -845,7 +953,7 @@ def visualisation3d(masked_image, crater_id, zone, swirl_on_or_off):
     X, Y = np.meshgrid(np.arange(cols), np.arange(rows))
 
     # Affichage en 3D
-    fig = plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(20, 7))
     ax = fig.add_subplot(111, projection='3d')
     ax.plot_surface(X, Y, masked_band, cmap='terrain', linewidth=0, antialiased=False)
 
