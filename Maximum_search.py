@@ -42,6 +42,7 @@ def Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value, 
 
     lowest_point_coord = None
     min_geom = None
+    not_enough_data = 0
 
     # Initialisation de l'angle étudié pour former les profils
     angle = 0
@@ -113,6 +114,18 @@ def Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value, 
 
                 max_coord_real.append(max_real_coordinates)
 
+                mask = line_value.mask  # masque des valeurs invalides ou masquées
+
+                nan_count = 0
+
+                for i in range(index_max[0][0]):
+                    if mask[i]:
+                        nan_count += 1
+                    else:
+                        if nan_count > 1:
+                            not_enough_data = 1
+                            nan_count = 0
+
                 lowest_point_coord = rasterio.transform.xy(out_transform, rr[0], cc[0])
                 limit_point_coord = rasterio.transform.xy(out_transform, rr[-1], cc[-1])
 
@@ -121,7 +134,7 @@ def Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value, 
                 min_geom = Point(lowest_point_coord[0], lowest_point_coord[1])
                 line_geom.append(LineString([lowest_point_coord, limit_point_coord]))
 
-    return lowest_point_coord, min_geom
+    return lowest_point_coord, min_geom, not_enough_data
 
 
 

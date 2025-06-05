@@ -9,6 +9,8 @@ from rasterio.mask import mask
 from rasterio.transform import from_origin
 from shapely.geometry import Polygon
 from scipy.ndimage import generic_filter
+import geopandas as gpd
+from PIL import Image
 
 
 ########################################################################################################################
@@ -95,6 +97,7 @@ def compute_TRI_array(image, no_data_value):
 def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, crs):
     """Main function to compute TRI index for a crater area."""
     # Define square polygon around center
+    # Définir le polygone à découper (carré centré)
     half_size = ray
     coords = [
         [center_x_dl - half_size, center_y_dl - half_size],
@@ -104,8 +107,75 @@ def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zo
     ]
     polygon = [Polygon(coords)]
 
-    # Clip raster using the polygon
+    # Découper le raster
     out_image, out_transform = mask(src, polygon, crop=True)
+    out_meta = src.meta
+    nodata_value = out_meta.get("nodata", None)
+
+    # Créer le masque des pixels à rendre noirs (nodata ou NaN)
+    mask_pixels = np.zeros_like(out_image[0], dtype=bool)
+
+    if nodata_value is not None:
+        mask_pixels |= np.any(out_image == nodata_value, axis=0)
+
+    if np.issubdtype(out_image.dtype, np.floating):
+        mask_pixels |= np.any(np.isnan(out_image), axis=0)
+
+    # Créer dossier de sortie si nécessaire
+    output_dir = f'results/RG{zone}/crater_img'
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Traitement de l'image
+    if out_image.shape[0] >= 3:
+        # RGB (au moins 3 bandes)
+        image_array = np.transpose(out_image[:3], (1, 2, 0))
+
+        if image_array.dtype != np.uint8:
+            valid_pixels = ~mask_pixels
+            valid_vals = image_array[valid_pixels]
+
+            if valid_vals.size == 0:
+                image_array[...] = 0
+            else:
+                nan_min = np.nanmin(valid_vals)
+                nan_max = np.nanmax(valid_vals)
+                ptp = nan_max - nan_min
+
+                if ptp == 0:
+                    image_array[...] = 0
+                else:
+                    image_array = ((image_array - nan_min) / ptp * 255).astype(np.uint8)
+
+        image_array[mask_pixels] = [0, 0, 0]
+        image = Image.fromarray(image_array)
+
+    else:
+        # Niveaux de gris
+        image_array = out_image[0]
+
+        if image_array.dtype != np.uint8:
+            valid_pixels = ~mask_pixels
+            valid_vals = image_array[valid_pixels]
+
+            if valid_vals.size == 0:
+                image_array[...] = 0
+            else:
+                nan_min = np.nanmin(valid_vals)
+                nan_max = np.nanmax(valid_vals)
+                ptp = nan_max - nan_min
+
+                if ptp == 0:
+                    image_array[...] = 0
+                else:
+                    image_array = ((image_array - nan_min) / ptp * 255).astype(np.uint8)
+
+        image_array[mask_pixels] = 0
+        image = Image.fromarray(image_array)
+
+    # Enregistrer l'image PNG
+    output_path = os.path.join(output_dir, f'crater_{id}.png')
+    image.save(output_path)
+    print(f"✅ Image enregistrée")
 
     # Compute TRI
     TRI_array = compute_TRI_array(out_image, no_data_value)
@@ -118,4 +188,6 @@ def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zo
     # Save outputs
     draw_TRI(TRI_array, id, zone)
     array_to_GeoTIF(TRI_array, coords[0], pixel_size_tb, id, zone, crs)
+
+    print(f"✅ TRI effectué")
 

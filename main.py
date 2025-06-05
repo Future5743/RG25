@@ -17,14 +17,14 @@ from Circularity import Miller_index
 from Slopes import max_crater_slopes_calculation, slope_calculation_by_PCA, inner_slopes, slopes_stopar_calculation
 from TRI import TRI
 from Topographical_profiles import main, visualisation3d
-from pdf_report import creer_rapport_cratere
+from PDF_report import creer_rapport_cratere
 
 
 ########################################################################################################################
 ##################################################### DATA OPENING #####################################################
 ########################################################################################################################
 
-zones = ['7']
+zones = ['5']
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 zone_settings = {
@@ -183,21 +183,23 @@ for zone in zones:
             ### --- HIGH ELEVATION --- ###
 
             # Initialize lists to store future data
-            max_value = []                      # Stores altitude values for highest_points
-            max_coord_relative = []             # Stores relative coordinates of highest_points
-            max_coord_real = []                 # Stores the actual coordinates of the highest_points
-            max_geom = []                       # Stores geometries of highest_points
-            line_geom = []                      # Stores the line geometries of the profiles studied
+            max_value = []                       # Stores altitude values for highest_points
+            max_coord_relative = []              # Stores relative coordinates of highest_points
+            max_coord_real = []                  # Stores the actual coordinates of the highest_points
+            max_geom = []                        # Stores geometries of highest_points
+            line_geom = []                       # Stores the line geometries of the profiles studied
             demi_profiles_value = []             # Stores topographic profiles
             demi_profiles_coords_relatives = []  # Stores the relative coordinates of points in the profile
-            index_maximum = []                  # Stores the index of the maximum point of each semi-profiles
+            index_maximum = []                   # Stores the index of the maximum point of each semi-profiles
 
-            lowest_point_coord, min_geom = Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value,
-                                                          max_coord_relative, max_coord_real, max_geom, line_geom,
-                                                          demi_profiles_value, demi_profiles_coords_relatives,
-                                                          index_maximum)
+            lowest_point_coord, min_geom, not_enough_data = Finding_maxima(min_pos, min_val, D, masked_image,
+                                                                           out_transform, max_value, max_coord_relative,
+                                                                           max_coord_real, max_geom, line_geom,
+                                                                           demi_profiles_value,
+                                                                           demi_profiles_coords_relatives,
+                                                                           index_maximum)
 
-            if len(max_geom) == 36:
+            if len(max_geom) == 36 and not_enough_data == 0:
 
             ### ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
 
@@ -484,10 +486,10 @@ for zone in zones:
                                                   center_x,
                                                   center_y,
                                                   lowest_point_coord,
-                                                  int(moy_diam),
+                                                  moy_diam,
                                                   round(delta_D_hoover, 0),
                                                   round(delta_Dbarre_stopar, 0),
-                                                  round(prof_moyen_crat, 1),
+                                                  prof_moyen_crat,
                                                   round(delta_d_stopar, 1),
                                                   round(delta_d_hoover, 1),
                                                   ratio_dD,
