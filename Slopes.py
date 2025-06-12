@@ -560,7 +560,6 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
                                                                compute with the method used in Stopar et al., 2017
 
     '''
-
     raster_path = f"../data/RG/RG{zone}_interpolation_robuste_02.TIF"
     raster_fiabilite_path = f"../data/RG/RG{zone}_interpolation_robuste_02_fiabilite_crop.TIF"
 
@@ -577,7 +576,27 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
         elevation_pre_impact = []
         diff_pre_impact = []
         fiabilite = []
+        all_fiab = []
+        all_indexes_valid = []
 
+        # Étape 1 : prétraitement pour décider la logique globale
+        for i, (profil_coords, profil_values) in enumerate(zip(demi_profils_coords_relatives, demi_profils_value)):
+            coord = max_coord_real[i]
+            elevation = list(raster_pre_impact.sample([coord]))[0][0]
+            elevation_pre_impact.append(elevation)
+
+            point_preimpact, index_preimpact = point_profile_near_preimpact_surface(
+                demi_profils_value[i], demi_profils_coords_relatives[i], elevation)
+
+            fiab = list(raster_fiabilite.sample([coord]))[0][0]
+            fiabilite.append(fiab)
+            all_fiab.append(fiab >= 0.8)
+            all_indexes_valid.append(index_preimpact > len(demi_profils_value[i]) * 1 / 3)
+
+        # Décision globale
+        use_all_inner = not all(all_fiab) or not all(all_indexes_valid)
+
+        # Étape 2 : boucle principale
         for i, (profil_coords, profil_values) in enumerate(zip(demi_profils_coords_relatives, demi_profils_value)):
             m = len(profil_coords[0])
             demi_profil = [[profil_coords[0][j], profil_coords[1][j], profil_values[j]] for j in range(m)]
@@ -586,33 +605,27 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
             profil_values_clean = np.array(profil_values)
             profil_values_clean = profil_values_clean[~np.isnan(profil_values_clean)]
 
-            coord = max_coord_real[i]  # (x, y) réel
-            elevation = list(raster_pre_impact.sample([coord]))[0][0]  # lecture unique
-            elevation_pre_impact.append(elevation)
+            elevation = elevation_pre_impact[i]
+            fiab = fiabilite[i]
 
-            point_preimpact, index_preimpact = point_profile_near_preimpact_surface(demi_profils_value[i],
-                                                                                   demi_profils_coords_relatives[i],
-                                                                                   elevation)
-
-
-            fiab = list(raster_fiabilite.sample([coord]))[0][0]
-            fiabilite.append(fiab)
+            point_preimpact, index_preimpact = point_profile_near_preimpact_surface(
+                demi_profils_value[i], demi_profils_coords_relatives[i], elevation)
 
             diff_pre_impact.append(max_value[i] - elevation)
 
-            if fiab > 0.8 and index_preimpact > len(demi_profils_value[i]) * 1/3:
-                point_rim = point_preimpact
-                idx_rim = index_preimpact
-            else:
+            if use_all_inner:
                 point_rim = point_inner[i][1]
                 idx_rim = idx_inner[i][1]
+            else:
+                print("On utilise l'interpolation pour trouver les points pre-impact")
+                point_rim = point_preimpact
+                idx_rim = index_preimpact
 
             floor = [profil_coords[0][crater_floor[i]], profil_coords[1][crater_floor[i]],
                      profil_values[crater_floor[i]]]
 
             slopes_point_inner_max_inner_min(slopes, uncertainty_slope, i, floor, point_rim,
-                                             pixel_size,
-                                             dz)
+                                             pixel_size, dz)
 
             s = []
             s_uncertainties = []
@@ -637,4 +650,5 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
 
     return slopes, slopes_px_to_px, geom, round(np.mean(slopes), 2), round(np.mean(slopes_px_to_px), 2), \
            uncertainty_slope, uncertainty_slope_px_to_px
+
 

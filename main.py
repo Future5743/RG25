@@ -8,11 +8,11 @@ import shutil
 import rasterio
 from rasterio.mask import mask
 import numpy as np
-from shapely.geometry import Point, Polygon, LineString
+from shapely.geometry import Point, Polygon
 from tqdm import tqdm
 from Maximum_search import Finding_maxima, horizontal_90, horizontal_270, vertical_360, vertical_180
 from Circularity import Miller_index
-from Slopes import max_crater_slopes_calculation, slope_calculation_by_PCA, inner_slopes, slopes_stopar_calculation
+from Slopes import max_crater_slopes_calculation, slope_calculation_by_PCA, slopes_stopar_calculation
 from TRI import TRI
 from Topographical_profiles import main, visualisation3d
 from PDF_report import creer_rapport_cratere
@@ -77,16 +77,11 @@ for zone in zones:
 
     # LINESTRING geometry
 
-    Lines_visualisation = []       # Stores line geometry for viewing each profile
-    inner_slopes_results = []      # Stores line geometry for the inner slopes of each crater
-    results_slopes_stopar_20 = []
+    results_slopes = []
 
     # POLYGON geometry
 
     rim_approx = []                 # Stores the geometry resulting from the polygon formed by the highest_points
-
-    # List to store information about the slope between opposite edges of a crater
-    results_slopes = []             # Stores the slopes formed by each profile
 
     # List to store information about a crater's circularity for all selected craters
     results_circularity = []
@@ -103,23 +98,16 @@ for zone in zones:
 ########################################################################################################################
 ######################################################### CODE #########################################################
 ########################################################################################################################
-    if os.path.exists(f"results/RG{zone}/profils"):
-        try:
-            shutil.rmtree("results/RG" + zone + "/profils")
-        except OSError as e:
-            print(f"Error: {e.strerror}")
+    folders = ["profils", "TRI", "crater_img", "rapports"]
+    base_path = f"results/RG{zone}"
 
-    if os.path.exists(f"results/RG{zone}/TRI"):
-        try:
-            shutil.rmtree("results/RG" + zone + "/TRI")
-        except OSError as e:
-            print(f"Error: {e.strerror}")
-
-    if os.path.exists(f"results/RG{zone}/crater_img"):
-        try:
-            shutil.rmtree("results/RG" + zone + "/crater_img")
-        except OSError as e:
-            print(f"Error: {e.strerror}")
+    for folder in folders:
+        path = os.path.join(base_path, folder)
+        if os.path.exists(path):
+            try:
+                shutil.rmtree(path)
+            except OSError as e:
+                print(f"Error removing {path}: {e.strerror}")
 
     # Open raster file
     with rasterio.open(raster_path) as src:
@@ -182,14 +170,13 @@ for zone in zones:
             max_coord_relative = []              # Stores relative coordinates of highest_points
             max_coord_real = []                  # Stores the actual coordinates of the highest_points
             max_geom = []                        # Stores geometries of highest_points
-            line_geom = []                       # Stores the line geometries of the profiles studied
             demi_profiles_value = []             # Stores topographic profiles
             demi_profiles_coords_relatives = []  # Stores the relative coordinates of points in the profile
             index_maximum = []                   # Stores the index of the maximum point of each semi-profiles
 
             lowest_point_coord, min_geom, not_enough_data = Finding_maxima(min_pos, min_val, D, masked_image,
                                                                            out_transform, max_value, max_coord_relative,
-                                                                           max_coord_real, max_geom, line_geom,
+                                                                           max_coord_real, max_geom,
                                                                            demi_profiles_value,
                                                                            demi_profiles_coords_relatives,
                                                                            index_maximum)
@@ -268,22 +255,6 @@ for zone in zones:
                             buf_diam_max = buffer_diam_max(lowest_point_coord[0], lowest_point_coord[1],
                                                            ray_largest_diam)
 
-                        # # DISTANCE MIN_VAL AVEC CHACUN DES POINTS HAUTS E,O,N,S
-                        #     def pixel_distance_centre_haut(pos1ch, pos2ch, pixel_size_ch=2):
-                        #
-                        #         # Calculer la distance euclidienne en pixels
-                        #         pixel_distance_ch = np.sqrt((pos2ch[0] - pos1ch[0]) ** 2
-                            #         + (pos2ch[1] - pos1ch[1]) ** 2)
-                        #
-                        #         # Conversion de la distance euclidienne en mètres
-                        #         distance_in_meters_ch = pixel_distance_ch * pixel_size_ch
-                        #         return distance_in_meters_ch
-                        #
-                        #     # Conversion de la distance euclidienne en mètres
-                        #     distance_centre_haut = pixel_distance_centre_haut(lowest_points[0], highest_points[0])
-                        #     print(f"Distance entre le point haut au Nord et le point bas au centre :
-                        #           {distance_centre_haut} mètres", crater_id)
-
                             ### --- AVERAGE CRATER DEPTH --- ###
 
                             depth = [x - min_val for x in max_value]
@@ -313,38 +284,6 @@ for zone in zones:
                             rel_err_ratio_hoover = np.sqrt(rel_err_prof_hoover ** 2 + rel_err_diam_hoover ** 2)
                             delta_dD_hoover = round(rel_err_ratio_hoover * ratio_dD, 3)
 
-                    # Ajouter les informations de Pente à la liste results_slopes
-                    #         results_slopes.append({'run_ID': crater_id,
-                    #                               'Altitude_PHN': round(max_val_top, 3),
-                    #                               'Altitude_PHE': round(max_val_right, 3),
-                    #                               'Altitude_PHS': round(max_val_bas, 3),
-                    #                               'Altitude_PHO': round(max_val_left, 3),
-                    #                               'GPS_PHN_x': max_x_top,
-                    #                               'GPS_PHN_y': max_y_top,
-                    #                               'GPS_PHE_x': max_x_rg,
-                    #                               'GPS_PHE_y': max_y_rg,
-                    #                               'GPS_PHS_x': max_x_bas,
-                    #                               'GPS_PHS_y': max_y_bas,
-                    #                               'GPS_PHO_x': max_x_lf,
-                    #                               'GPS_PHO_y': max_y_lf,
-                    #                               'SCR': src.crs.to_string(),
-                    #                               'Hauteur_PHS_PHN': round(altitude_difference_ns, 3),
-                    #                               'degres_pente_PHS_PHN': round(slope_degrees_ns, 2),
-                    #                               'Hauteur_PHE_PHO': round(altitude_difference, 3),
-                    #                               'degres_pente_PHE_PHO': round(slope_degrees_eo, 2)
-                    #                                })
-
-                        # Ajouter les informations de Circularité à la liste results_circularity
-                        #     results_circularity.append({'run_ID': crater_id,
-                        #                                 'Diametre_PHS_PHN': distance_bas_top,
-                        #                                 'Diametre_PHE_PHO': distance_right_left,
-                        #                                 'Moyenne_diametre': moy_diam,
-                        #                                 'Circularite': round(circularity, 2)
-                        #                                 })
-
-                            # Teste si le pixel haut Est, Ouest, Nord et Sud ne se trouve pas trop prêt de la limite du
-                            # fichier de forme de polygone "selection_crateres.shp"
-
         ### Add geometry from highest_points
                             rim_approx_geom = Polygon(max_coord_real)
 
@@ -358,17 +297,6 @@ for zone in zones:
                                                                                              precision_error,
                                                                                              n_simulations=100,
                                                                                              visualize=False)
-                            """
-                            inner_slopes_deg, inner_slopes_delimitation = [], []
-
-                            mean_inner_slope = inner_slopes(inner_slopes_deg,
-                                                            inner_slopes_delimitation,
-                                                            demi_profiles_value,
-                                                            demi_profiles_coords_relatives,
-                                                            zone, crater_id, swirl_on_or_off,
-                                                            out_transform, index_maximum,
-                                                            pixel_size_tb, precision_error)
-                            """
 
                             visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
                             
@@ -380,13 +308,13 @@ for zone in zones:
                                                                         no_data_value, depth, min_val)
 
                             (
-                                slopes_stopar_20,
-                                slopes_px2px_20,
-                                slopes_stopar_geom_20,
-                                mean_slope_stopar_20,
-                                mean_slope_px2px_20,
-                                delta_stopar_20,
-                                delta_stopar_px2px_20
+                                slopes_calas,
+                                slopes_stopar,
+                                slopes_stopar_geom,
+                                mean_slope_calas,
+                                mean_slope_stopar,
+                                delta_calas,
+                                delta_stopar
                             ) = slopes_stopar_calculation(
                                 demi_profiles_value,
                                 demi_profiles_coords_relatives,
@@ -424,9 +352,9 @@ for zone in zones:
                                                   delta_dD_stopar,
                                                   delta_dD_hoover,
                                                   circularity,
-                                                  mean_slope_px2px_20,
-                                                  slopes_px2px_20,
-                                                  delta_stopar_px2px_20
+                                                  mean_slope_stopar,
+                                                  slopes_stopar,
+                                                  delta_stopar
                                                   )
 
                             # Commune attributes
@@ -437,15 +365,7 @@ for zone in zones:
 
                             # Line (profiles)
                             angle = 0
-                            for i, geom in enumerate(line_geom):
-                                Lines_visualisation.append({
-                                    'geometry': geom,
-                                    **common_attrs,
-                                    'position': f'Ligne à {angle}°',
-                                    'slopesPCA': slopes_PCA[i],
-                                    'δ_PCA': delta_PCA[i],
-                                    'meanPCA': mean_slope_PCA
-                                })
+                            for i, geom in enumerate(max_geom):
 
                                 highest_points.append({
                                     'geometry': max_geom[i],
@@ -456,31 +376,19 @@ for zone in zones:
                                     'position': f'Point à {angle}°'
                                 })
 
-                                """
-                                point1 = list(inner_slopes_delimitation[i][0][:2])
-
-                                point2 = list(inner_slopes_delimitation[i][1][:2])
-
-                                inner_slopes_results.append({
-                                    'geometry': LineString([point1, point2]),
+                                results_slopes.append({
+                                    'geometry': slopes_stopar_geom[i],
                                     **common_attrs,
                                     'position': f'Ligne à {angle}°',
-                                    'slope': round(inner_slopes_deg[i], 2),
-                                    'meanSlope': mean_inner_slope,
-                                    # 'δ_slope': uncertainty_inner_slope[i]
-                                })
-                                """
-
-                                results_slopes_stopar_20.append({
-                                    'geometry': slopes_stopar_geom_20[i],
-                                    **common_attrs,
-                                    'position': f'Ligne à {angle}°',
-                                    'slopeCalas': slopes_stopar_20[i],
-                                    'δCalas': delta_stopar_20[i],
-                                    'slopeStopar': slopes_px2px_20[i],
-                                    'δStopar': delta_stopar_px2px_20[i],
-                                    'meanCalas': mean_slope_stopar_20,
-                                    'meanStopar': mean_slope_px2px_20
+                                    'slopeCalas': slopes_calas[i],
+                                    'δCalas': delta_calas[i],
+                                    'slopeStopar': slopes_stopar[i],
+                                    'δStopar': delta_stopar[i],
+                                    'meanCalas': mean_slope_calas,
+                                    'meanStopar': mean_slope_stopar,
+                                    'slopesPCA': slopes_PCA[i],
+                                    'δ_PCA': delta_PCA[i],
+                                    'meanPCA': mean_slope_PCA
                                 })
 
                                 angle += 10
@@ -564,15 +472,13 @@ for zone in zones:
 
     # List of the wanted shapefiles
     shapefile_data = [
-        (result_geom_select_crat,       f'results_geom_08_40m_RG{zone}_v2'),
-        (lowest_points,                 f'results_geom_bas_RG{zone}'),
-        (highest_points,                f'results_geom_max_RG{zone}'),
-        (profile_90,                    f'results_geom_90_RG{zone}'),
-        (Lines_visualisation,           f'results_geom_line_RG{zone}'),
-        (centers,                       f'results_geom_centers_RG{zone}'),
-        (rim_approx,                    f'results_geom_rim_RG{zone}'),
-        # (inner_slopes_results,          f'results_geom_slopes_RG{zone}'),
-        (results_slopes_stopar_20,      f'results_geom_slopes_stopar_20_RG{zone}')
+        (result_geom_select_crat,       f'0_results_global_RG{zone}'),
+        (rim_approx,                    f'1_results_rim_RG{zone}'),
+        (results_slopes,                f'2_results_slopes_RG{zone}'),
+        (highest_points,                f'3_results_max_RG{zone}'),
+        (lowest_points,                 f'4_results_low_RG{zone}'),
+        (centers,                       f'5_results_centers_RG{zone}'),
+        (profile_90,                    f'6_results_90_RG{zone}')
     ]
     # Création et export des GeoDataFrames
     for data, filename in shapefile_data:
