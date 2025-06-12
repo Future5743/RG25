@@ -1,10 +1,8 @@
-# 11/04/2025. Code en cours de mise à jour.
-
 ########################################################################################################################
 ##################################################### IMPORTATIONS #####################################################
 ########################################################################################################################
 
-import geopandas as gpd    # Import of the “Geopandas” python library. Allows you to manipulate geographic data
+import geopandas as gpd
 import os
 import shutil
 import rasterio
@@ -24,7 +22,7 @@ from PDF_report import creer_rapport_cratere
 ##################################################### DATA OPENING #####################################################
 ########################################################################################################################
 
-zones = ['5']
+zones = ['2']
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 zone_settings = {
@@ -82,13 +80,10 @@ for zone in zones:
     Lines_visualisation = []       # Stores line geometry for viewing each profile
     inner_slopes_results = []      # Stores line geometry for the inner slopes of each crater
     results_slopes_stopar_20 = []
-    results_slopes_stopar_30 = []
 
     # POLYGON geometry
 
     rim_approx = []                 # Stores the geometry resulting from the polygon formed by the highest_points
-
-    rim_approx_smooth = []          # Stores the smoothed geometry resulting from the polygon formed by the rim
 
     # List to store information about the slope between opposite edges of a crater
     results_slopes = []             # Stores the slopes formed by each profile
@@ -132,7 +127,7 @@ for zone in zones:
         no_data_value = src.nodata
 
         for _, crater in tqdm(craters.iterrows(), total=len(craters)):
-            # Données du cratère
+            # Crater's data
             crater_geom = [crater.geometry]
             crater_id = crater.run_ID
             nac_id = crater.NAC_DTM_ID
@@ -142,16 +137,16 @@ for zone in zones:
 
             coord_center_geom = Point(coord_center)
 
-            # Découpe du raster avec le cratère
+            # Cut of the DTM with the crater
             try:
                 out_image, out_transform = mask(src, crater_geom, crop=True)
             except ValueError:
                 continue  # Skip invalid geometries or ones falling outside raster extent
 
-            # Masquage des valeurs no_data
+            # Hide no_data values
             masked_image = np.ma.masked_equal(out_image, no_data_value)
 
-            # Création d'un GeoDataFrame pour le centre du cratère
+            # Geodataframe for the crater center
             crater_center = gpd.GeoDataFrame(
                 [{'geometry': Point(center_x, center_y)}],
                 crs=craters.crs
@@ -160,11 +155,11 @@ for zone in zones:
             ### --- HIESINGER --- ###
             crater_center = crater_center.to_crs(hiesinger.crs)
 
-            # Vérifie si le centre est contenu dans un polygone Hiesinger
+            # Check if the crater is in a Heisinger polygon
             matches_hiesinger = hiesinger.geometry.contains(crater_center.geometry.iloc[0])
 
             if not matches_hiesinger.any():
-                continue  # Pas d'info d'âge pour ce cratère
+                continue  # No data for this crater
 
             floor_age = hiesinger.loc[matches_hiesinger, 'Model_Age'].values[0]
 
@@ -251,49 +246,15 @@ for zone in zones:
 
                 if dist_lowest_point_center < moy_diam * 0.25 and moy_diam >= 40:
 
-                    '''
-                # Profil vertical
-                    # Calcul de la distance euclidienne en pixels entre max_pos_bas et max_pos_top 
-                    # et la convertir en mètres
-                    def calculate_pixel_distance_tb(pos1tb, pos2tb, pixel_size_tb=5):
-    
-                        # Calculer la distance euclidienne en pixels
-                        pixel_distance_tb = np.sqrt((pos2tb[0] - pos1tb[0]) ** 2 + (pos2tb[1] - pos1tb[1]) ** 2)
-    
-                        # Convertir la distance en mètres
-                        distance_in_meters_tb = pixel_distance_tb * pixel_size_tb
-                        return distance_in_meters_tb
-    
-                    # Conversion de la distance euclidienne en mètres
-                    distance_bas_top = calculate_pixel_distance_tb(max_pos_bas, max_pos_top)
-    
-                # Profil horizontal
-                    # Calcul de la distance euclidienne en pixels entre max_pos_right et max_pos_left 
-                    # et la convertir en mètres
-                    def calculate_pixel_distance_lr(pos1lr, pos2lr, pixel_size_lr=5):
-    
-                        # Calculer la distance euclidienne en pixels
-                        pixel_distance_lr = np.sqrt((pos2lr[0] - pos1lr[0]) ** 2 + (pos2lr[1] - pos1lr[1]) ** 2)
-    
-                        # Conversion de la distance euclidienne en mètres
-                        distance_in_meters_lr = pixel_distance_lr * pixel_size_lr
-                        return distance_in_meters_lr
-    
-                    # Conversion de la distance euclidienne en mètres
-                    distance_right_left = calculate_pixel_distance_lr(max_pos_right, max_pos_left)
-                    '''
-
-                # Calculation of Miller's circularity index
+                    ### --- CIRCULARITY --- ###
                     circularity = Miller_index(min_pos, max_coord_relative, pixel_size_tb)
                     circularity = round(circularity, 2)
 
-                    if 0.90 <= circularity <= 1:
+                    if 0.99 <= circularity <= 1:
 
                         ### --- SLOPES --- ###
 
                         max_slope_crater = max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size_tb)
-
-                        print(f"Pentes maximale entre deux points opposés sur la crête du cratère: {max_slope_crater}")
 
                         if max_slope_crater < 8:
 
@@ -387,42 +348,6 @@ for zone in zones:
         ### Add geometry from highest_points
                             rim_approx_geom = Polygon(max_coord_real)
 
-        ### Smoothing the polygon from the previous polygon
-
-                            '''
-                            def bezier_curve(p0, p1, p2, n=20) :
-                                t = np.linspace(0,1,n)
-    
-                                return (1-t)[:, None]**2 * p0 + 2 * (1-t)[:, None] * t[:, None] * p1 
-                                        + t[:, None]**2 * p2
-    
-                            def smooth_polygon_with_bezier (poly: Polygon, n=20) :
-                                if not poly.is_valid:
-                                    raise ValueError("Polygone non valide")
-                                coords = list(poly.exterior.coords)
-    
-                                if coords[0] != coords[-1]:
-                                    coords.append(coords[0])
-    
-                                smoothed_points = []
-    
-                                for i in range(len(coords) - 2):
-                                    p0 = np.array(coords[i])
-                                    p1 = np.array(coords[i+1])
-                                    p2 = np.array(coords[i+2])
-    
-                                    curve = bezier_curve(p0, p1, p2, n)
-                                    smoothed_points.extend(curve[:-1]) #Pour éviter les doublons
-    
-                                smoothed_points.append(smoothed_points[0])
-    
-                                smooth_poly = Polygon(smoothed_points)
-    
-                                return orient(smooth_poly)
-    
-                            rim_approx_smooth_geom = smooth_polygon_with_bezier(rim_approx_geom)
-                            '''
-
                             ### --- SLOPES CALCULATION --- ###
 
                             slopes_PCA, mean_slope_PCA, delta_PCA = slope_calculation_by_PCA(demi_profiles_value,
@@ -465,13 +390,16 @@ for zone in zones:
                             ) = slopes_stopar_calculation(
                                 demi_profiles_value,
                                 demi_profiles_coords_relatives,
+                                max_coord_real,
+                                max_value,
                                 point_inner,
                                 idx_inner,
                                 crater_floor,
                                 pixel_size_tb,
                                 precision_error,
                                 out_transform,
-                                no_data_value
+                                no_data_value,
+                                zone
                             )
 
                             ### --- TRI ALGORITHM --- ###

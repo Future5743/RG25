@@ -503,8 +503,26 @@ def slope_uncertainties(uncertainty_slope, point_1, point_2, dist, pixel_size, d
     uncertainty_slope.append(round(delta_slope, 2))
 
 
-def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives, point_inner, idx_inner, crater_floor, pixel_size, dz,
-                              out_transform, no_data_value,):
+def point_profile_near_preimpact_surface(demi_profils_value, demi_profils_coords_relatives, elevation_preimpact):
+
+    point_pre_impact = None
+    idx_preimpact = 0
+    dist_preimpact = np.inf
+
+    for i in range(len(demi_profils_value)):
+        if np.isnan(demi_profils_value[i]):
+            continue
+        if abs(elevation_preimpact - demi_profils_value[i]) < dist_preimpact:
+            dist_preimpact, point_pre_impact, idx_preimpact = abs(elevation_preimpact - demi_profils_value[i]), \
+                                                              [demi_profils_coords_relatives[0][i],
+                                                               demi_profils_coords_relatives[1][i],
+                                                               demi_profils_value[i]],\
+                                                              i
+
+    return point_pre_impact, idx_preimpact
+
+def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives, max_coord_real, max_value, point_inner, idx_inner, crater_floor, pixel_size, dz,
+                              out_transform, no_data_value, zone):
     '''
     This function compute the crater's slopes with the method used in Stopar et al., 2017.
 
@@ -543,46 +561,80 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
 
     '''
 
-    slopes = []
-    slopes_px_to_px = []
+    raster_path = f"../data/RG/RG{zone}_interpolation_robuste_02.TIF"
+    raster_fiabilite_path = f"../data/RG/RG{zone}_interpolation_robuste_02_fiabilite_crop.TIF"
 
-    # Uncertainties
-    uncertainty_slope = []
-    uncertainty_slope_px_to_px = []
+    with rasterio.open(raster_path) as raster_pre_impact, rasterio.open(raster_fiabilite_path) as raster_fiabilite:
+        print(raster_pre_impact)
+        slopes = []
+        slopes_px_to_px = []
 
-    geom = []
+        # Uncertainties
+        uncertainty_slope = []
+        uncertainty_slope_px_to_px = []
 
-    for i, (profil_coords, profil_values) in enumerate(zip(demi_profils_coords_relatives, demi_profils_value)):
+        geom = []
+        elevation_pre_impact = []
+        diff_pre_impact = []
+        fiabilite = []
 
-        m = len(profil_coords[0])
-        demi_profil = [[profil_coords[0][j], profil_coords[1][j], profil_values[j]] for j in range(m)]
+        for i, (profil_coords, profil_values) in enumerate(zip(demi_profils_coords_relatives, demi_profils_value)):
+            m = len(profil_coords[0])
+            demi_profil = [[profil_coords[0][j], profil_coords[1][j], profil_values[j]] for j in range(m)]
+            demi_profil = np.where(demi_profil == no_data_value, np.nan, demi_profil)
 
-        demi_profil = np.where(demi_profil == no_data_value, np.nan, demi_profil)
-        profil_values_clean = np.array(profil_values)
-        profil_values_clean = profil_values_clean[~np.isnan(profil_values_clean)]
-        min_val_profil = np.min(profil_values_clean)
+            profil_values_clean = np.array(profil_values)
+            profil_values_clean = profil_values_clean[~np.isnan(profil_values_clean)]
 
-        # Calculs des pentes...
-        help_please_jpp = [profil_coords[0][crater_floor[i]], profil_coords[1][crater_floor[i]], profil_values[crater_floor[i]]]
+            coord = max_coord_real[i]  # (x, y) réel
+            elevation = list(raster_pre_impact.sample([coord]))[0][0]  # lecture unique
+            elevation_pre_impact.append(elevation)
 
-        slopes_point_inner_max_inner_min(slopes, uncertainty_slope, i, help_please_jpp, point_inner[i][1], pixel_size, dz)
-
-        # Calcul des pentes px à px
-        s = []
-        s_uncertainties = []
+            point_preimpact, index_preimpact = point_profile_near_preimpact_surface(demi_profils_value[i],
+                                                                                   demi_profils_coords_relatives[i],
+                                                                                   elevation)
 
 
-        mean_slope_px, mean_uncertainty = slopes_px2px(s, s_uncertainties, crater_floor[i], idx_inner[i][1],
-                                                       demi_profil, pixel_size, dz)
+            fiab = list(raster_fiabilite.sample([coord]))[0][0]
+            fiabilite.append(fiab)
 
-        slopes_px_to_px.append(mean_slope_px)
-        uncertainty_slope_px_to_px.append(mean_uncertainty)
+            diff_pre_impact.append(max_value[i] - elevation)
 
-        # Construction géométrie
-        geom.append(LineString([
-            rasterio.transform.xy(out_transform, point_inner[i][0][0], point_inner[i][0][1]),
-            rasterio.transform.xy(out_transform, point_inner[i][1][0], point_inner[i][1][1])
-        ]))
+            if fiab > 0.8 and index_preimpact > len(demi_profils_value[i]) * 1/3:
+                point_rim = point_preimpact
+                idx_rim = index_preimpact
+            else:
+                point_rim = point_inner[i][1]
+                idx_rim = idx_inner[i][1]
+
+            floor = [profil_coords[0][crater_floor[i]], profil_coords[1][crater_floor[i]],
+                     profil_values[crater_floor[i]]]
+
+            slopes_point_inner_max_inner_min(slopes, uncertainty_slope, i, floor, point_rim,
+                                             pixel_size,
+                                             dz)
+
+            s = []
+            s_uncertainties = []
+
+            mean_slope_px, mean_uncertainty = slopes_px2px(
+                s, s_uncertainties, crater_floor[i], idx_rim,
+                demi_profil, pixel_size, dz
+            )
+
+            if mean_slope_px == 0:
+                print(f"Fiabilité: {fiab}")
+                print(f"point preimpact: {point_preimpact}")
+                print(f"POint au sol: {floor}")
+
+            slopes_px_to_px.append(mean_slope_px)
+            uncertainty_slope_px_to_px.append(mean_uncertainty)
+
+            geom.append(LineString([
+                rasterio.transform.xy(out_transform, floor[0], floor[1]),
+                rasterio.transform.xy(out_transform, point_rim[0], point_rim[1])
+            ]))
 
     return slopes, slopes_px_to_px, geom, round(np.mean(slopes), 2), round(np.mean(slopes_px_to_px), 2), \
            uncertainty_slope, uncertainty_slope_px_to_px
+
