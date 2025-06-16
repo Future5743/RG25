@@ -12,7 +12,7 @@ from shapely.geometry import Point, Polygon
 from tqdm import tqdm
 from Maximum_search import Finding_maxima, horizontal_90, horizontal_270, vertical_360, vertical_180
 from Circularity import Miller_index
-from Slopes import max_crater_slopes_calculation, slope_calculation_by_PCA, slopes_stopar_calculation
+from Slopes import max_crater_slopes_calculation, slopes_stopar_calculation
 from TRI import TRI
 from Topographical_profiles import main, visualisation3d
 from PDF_report import creer_rapport_cratere
@@ -48,7 +48,7 @@ for zone in zones:
 
     # Path for data
     crater_shapefile_path = os.path.join('data', 'Buffer_crateres', f'Buffer_RG{zone}')
-    raster_path = os.path.join('..', 'data', 'RG', f'NAC_DTM_REINER{zone}.tiff')
+    raster_path = os.path.join('..', 'data', 'RG', 'DTM', f'NAC_DTM_REINER{zone}.tiff')
     hiesinger_path = os.path.join('data', 'HIESINGER2011_MARE_AGE_UNITS_180', 'HIESINGER2011_MARE_AGE_UNITS_180.SHP')
     swirls_path = os.path.join('data', 'Swirl', 'REINER_GAMMA.shp')
 
@@ -183,6 +183,8 @@ for zone in zones:
 
             if len(max_geom) == 36 and not_enough_data == 0:
 
+                print("✅ The maximum points calculation done")
+
             ### ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
 
                 max_val_right, point_haut_horiz_90 = horizontal_90(min_pos, masked_image, no_data_value, out_transform)
@@ -215,13 +217,11 @@ for zone in zones:
                 moy_diam = round(np.mean(D), 2)
 
                 # Uncertainty of a diameter
-                delta_D_stopar = np.sqrt(2) * pixel_size_tb                                 # Stopar et al., 2017
 
                 delta_D_hoover = np.sqrt(np.std(D)**2 + pixel_size_tb**2)                   # Hoover et al., 2024
 
                 # Uncertainty of average
                 N = len(D)
-                delta_Dbarre_stopar = round(delta_D_stopar / np.sqrt(N), 2)                 # Stopar et al., 2017
 
                 delta_Dbarre_hoover = round(delta_D_hoover / np.sqrt(N), 2)                 # Hoover et al., 2024
 
@@ -231,11 +231,15 @@ for zone in zones:
                 dist_lowest_point_center = np.sqrt((lowest_point_coord[0] - coord_center[0]) ** 2
                                                    + (lowest_point_coord[1] - coord_center[1]) ** 2) * pixel_size_tb
 
+                print("✅ The diameter calculation done")
+
                 if dist_lowest_point_center < moy_diam * 0.25 and moy_diam >= 40:
 
                     ### --- CIRCULARITY --- ###
                     circularity = Miller_index(min_pos, max_coord_relative, pixel_size_tb)
                     circularity = round(circularity, 2)
+
+                    print("✅ Circularity calculation done")
 
                     if 0.99 <= circularity <= 1:
 
@@ -261,8 +265,6 @@ for zone in zones:
 
                             prof_moyen_crat = round(np.mean(depth), 3)
 
-                            delta_d_stopar = np.sqrt(2) * precision_error / np.sqrt(N)      # Stopar et al., 2017
-
                             sigma = np.sqrt(precision_error ** 2 + np.std(depth) ** 2)
                             delta_d_hoover = sigma / np.sqrt(N + 1)                         # Hoover et al., 2024
 
@@ -272,31 +274,18 @@ for zone in zones:
 
                             # d/D UNCERTAINTIES CALCULATION
 
-                            ## Stopar et al., 2017
-                            rel_err_prof_stopar = delta_d_stopar / prof_moyen_crat
-                            rel_err_diam_stopar = delta_Dbarre_stopar / moy_diam
-                            rel_err_ratio_stopar = np.sqrt(rel_err_prof_stopar ** 2 + rel_err_diam_stopar ** 2)
-                            delta_dD_stopar = round(rel_err_ratio_stopar * ratio_dD, 3)
-
                             ## Hoover et al., 2024
                             rel_err_prof_hoover = delta_d_hoover / prof_moyen_crat
                             rel_err_diam_hoover = delta_D_hoover / moy_diam
                             rel_err_ratio_hoover = np.sqrt(rel_err_prof_hoover ** 2 + rel_err_diam_hoover ** 2)
                             delta_dD_hoover = round(rel_err_ratio_hoover * ratio_dD, 3)
 
+                            print("✅ d/D done")
+
         ### Add geometry from highest_points
                             rim_approx_geom = Polygon(max_coord_real)
 
                             ### --- SLOPES CALCULATION --- ###
-
-                            slopes_PCA, mean_slope_PCA, delta_PCA = slope_calculation_by_PCA(demi_profiles_value,
-                                                                                             demi_profiles_coords_relatives,
-                                                                                             index_maximum,
-                                                                                             out_transform,
-                                                                                             pixel_size_tb,
-                                                                                             precision_error,
-                                                                                             n_simulations=100,
-                                                                                             visualize=False)
 
                             visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
                             
@@ -308,13 +297,12 @@ for zone in zones:
                                                                         no_data_value, depth, min_val)
 
                             (
-                                slopes_calas,
                                 slopes_stopar,
                                 slopes_stopar_geom,
-                                mean_slope_calas,
                                 mean_slope_stopar,
-                                delta_calas,
-                                delta_stopar
+                                delta_stopar,
+                                hauteur_crete,
+                                fiabilite
                             ) = slopes_stopar_calculation(
                                 demi_profiles_value,
                                 demi_profiles_coords_relatives,
@@ -330,9 +318,29 @@ for zone in zones:
                                 zone
                             )
 
+                            print("✅ SLopes calculation done")
+
                             ### --- TRI ALGORITHM --- ###
                             TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
                                 craters.crs)
+
+                            print("✅ TRI done")
+
+                            ### --- AUTOMATIC CLASSIFICATION --- ###
+
+                            if ratio_dD > 1/5 and np.max(slopes_stopar) > 35:
+                                state = "A"
+                            if 1/7 < ratio_dD < 1/5 and 25 < np.max(slopes_stopar) < 35:
+                                state = "AB"
+
+                            if 1/10 < ratio_dD < 1/7 and 15 < np.max(slopes_stopar) < 25:
+                                state = "B"
+
+                            if ratio_dD < 1/10 and np.max(slopes_stopar) < 15:
+                                state = "C"
+
+                            else:
+                                state = "Unknown"
 
                             ### --- RAPORT --- ###
                             creer_rapport_cratere(crater_id,
@@ -344,12 +352,9 @@ for zone in zones:
                                                   lowest_point_coord,
                                                   moy_diam,
                                                   round(delta_D_hoover, 0),
-                                                  round(delta_Dbarre_stopar, 0),
                                                   prof_moyen_crat,
-                                                  round(delta_d_stopar, 1),
                                                   round(delta_d_hoover, 1),
                                                   ratio_dD,
-                                                  delta_dD_stopar,
                                                   delta_dD_hoover,
                                                   circularity,
                                                   mean_slope_stopar,
@@ -380,15 +385,13 @@ for zone in zones:
                                     'geometry': slopes_stopar_geom[i],
                                     **common_attrs,
                                     'position': f'Ligne à {angle}°',
-                                    'slopeCalas': slopes_calas[i],
-                                    'δCalas': delta_calas[i],
                                     'slopeStopar': slopes_stopar[i],
                                     'δStopar': delta_stopar[i],
-                                    'meanCalas': mean_slope_calas,
                                     'meanStopar': mean_slope_stopar,
-                                    'slopesPCA': slopes_PCA[i],
-                                    'δ_PCA': delta_PCA[i],
-                                    'meanPCA': mean_slope_PCA
+                                    'rim_height': hauteur_crete[i],
+                                    'reliability': fiabilite[i],
+                                    'mean_rim_h': np.mean(hauteur_crete),
+                                    'mean_relia': np.mean(fiabilite)
                                 })
 
                                 angle += 10
@@ -420,20 +423,20 @@ for zone in zones:
                                 'geometry': buf_diam_max,
                                 **common_attrs,
                                 "morphology": crater_morph,
+                                "deterior": state,
                                 'center_lon': center_x,
                                 'center_lat': center_y,
                                 'ray_maxdia': ray_largest_diam,
                                 'moyen_diam': int(moy_diam),
-                                'δ_D_stop': round(delta_Dbarre_stopar, 0),
                                 'δ_D_hoov': round(delta_D_hoover, 0),
                                 'prof_moyen': round(prof_moyen_crat, 1),
-                                'δ_d_stop': round(delta_d_stopar, 1),
                                 'δ_d_hoov': round(delta_d_hoover, 1),
                                 'ratio_dD': ratio_dD,
-                                'δ_dD_stop': delta_dD_stopar,
                                 'δ_dD_hoov': delta_dD_hoover,
                                 'circu': circularity,
-                                'pente_rim': max_slope_crater,
+                                'mean_slope': mean_slope_stopar,
+                                'mean_rim_h': np.mean(hauteur_crete),
+                                'mean_relia': np.mean(fiabilite),
                                 'swirl': swirl_on_or_off,
                                 'hiesinger': floor_age
                             })
@@ -486,9 +489,3 @@ for zone in zones:
         shapefile_path = f'results/RG{zone}/{filename}.shp'
         gdf.to_file(shapefile_path)
 
-    '''
-    gdf_rim_smoothed = gpd.GeoDataFrame(rim_approx_smooth, crs=craters.crs)
-    # Enregistrer le GeoDataFrame au format Shapefile
-    shapefile_path = 'results/RG' + zone + '/results_geom_rim_smoothed_RG' + zone + '.shp'
-    gdf_rim_smoothed.to_file(shapefile_path)
-    '''

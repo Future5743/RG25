@@ -373,7 +373,7 @@ def save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
     selected_points = []
     selected_indices = []
 
-    fig, ax = plt.subplots(figsize=(20, 7))
+    fig, ax = plt.subplots(figsize=(15, 7))
     ax.plot(X, full_profile, color='blue', marker='x', label='Profil topographique')
     ax.set_title(f'Sélectionnez deux points pour le cratère {crater_id} (angle {i * 10}°)')
     ax.set_xlabel("Distance (m)")
@@ -399,14 +399,13 @@ def save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
         nonlocal selected_indices
 
         # Si aucun clic → on garde les indices automatiques
-        if len(selected_indices) < 2:
-            print("Aucun point cliqué, on garde les indices automatiques :", automatic_indices)
+        if len(selected_indices) < 1:
             selected_indices = automatic_indices
-        else:
-            print("Indices sélectionnés :", selected_indices)
+        if len(selected_indices) == 1:
+            selected_indices = [selected_indices[0]]*2
 
         # Profil complet final avec légende
-        fig_final, ax_final = plt.subplots(figsize=(20, 7))
+        fig_final, ax_final = plt.subplots(figsize=(15, 7))
 
         for idx in indices_20:
             if idx < len(X):
@@ -445,7 +444,7 @@ def save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
     idx_l = int(np.argmin(np.abs(X_slice - floor_left)))
     idx_r = int(np.argmin(np.abs(X_slice - floor_right)))
 
-    plt.figure(figsize=(20, 7))
+    plt.figure(figsize=(15, 7))
     plt.scatter(X_slice[idx_l], second_derivative[idx_l], color='green', zorder=5)
     plt.scatter(X_slice[idx_r], second_derivative[idx_r], color='green', zorder=5)
     plt.plot(X_slice, second_derivative, color='red', label='Seconde dérivée')
@@ -530,7 +529,7 @@ def save_average_profile(profil_moyen, min_X, path):
         no exit data
     '''
 
-    plt.figure(figsize=(20, 7))
+    plt.figure(figsize=(15, 7))
     plt.plot(min_X, profil_moyen, marker='x')
     plt.xlabel("Distance (m)")
     plt.ylabel("Altitude")
@@ -538,52 +537,6 @@ def save_average_profile(profil_moyen, min_X, path):
     plt.grid(True)
     plt.savefig(path + "/Profil_moyen.png")
     plt.close()
-
-
-def smooth_profile(y):
-    '''
-    This functon smmoth a profile.
-
-    Entries:
-        y: list                     -- Contains the elevations of the profile
-
-    Exit data:
-        y_smmoth: list              -- Contains the elevations of the smoothed profile
-    '''
-
-    y = np.asarray(y)
-
-    window_length = min(21, len(y) - 1)
-
-    if window_length % 2 == 0:
-        window_length -= 1
-
-    polyorder = 2
-
-    if np.any(np.isnan(y)) or np.any(np.isinf(y)):
-        index_nan = np.where(np.isnan(y))
-
-        for i in index_nan[0]:
-            a = i
-            if i < len(y) / 2:
-                while np.isnan(y[i]):
-                    a += 1
-                    y[i] = y[a]
-            else:
-                while np.isnan(y[i]):
-                    a -= 1
-                    y[i] = y[a]
-
-    if len(y) < window_length:
-        window_length = len(y) if len(y) % 2 != 0 else len(y) - 1
-        if window_length < polyorder + 2:
-            raise ValueError(f"Taille de y trop petite ({len(y)}) pour appliquer un filtre de Savitzky-Golay")
-
-    polyorder = min(polyorder, window_length - 1)
-
-    y_smooth = savgol_filter(y, window_length=window_length, polyorder=polyorder)
-
-    return y_smooth
 
 
 def extract_cleaned_profile(profil_coords, profil_values, no_data_value):
@@ -623,19 +576,33 @@ def find_inner_points(demi_profil, depth_value, min_val):
     alt_min = 0.2 * depth_value + min_val
     alt_max = 0.8 * depth_value + min_val
 
+    # Trouver l'index du point avec l'altitude maximale
+    max_idx = -1
+    max_z = -np.inf
+    for i, (_, _, z) in enumerate(demi_profil):
+        if not np.isnan(z) and z > max_z:
+            max_z = z
+            max_idx = i
+
     point_min = point_max = None
     idx_min = idx_max = -1
     dist_min = dist_max = np.inf
 
-    for idx, (_, _, z) in enumerate(demi_profil):
+    # Ne considérer que les points avant le point le plus haut
+    for idx in range(max_idx):
+        _, _, z = demi_profil[idx]
         if np.isnan(z):
             continue
         if abs(z - alt_min) < dist_min:
-            dist_min, point_min, idx_min = abs(z - alt_min), demi_profil[idx], idx
+            dist_min = abs(z - alt_min)
+            point_min = demi_profil[idx]
+            idx_min = idx
         if abs(z - alt_max) < dist_max:
-            dist_max, point_max, idx_max = abs(z - alt_max), demi_profil[idx], idx
+            dist_max = abs(z - alt_max)
+            point_max = demi_profil[idx]
+            idx_max = idx
 
-    # S'assurer de l'ordre
+    # Assurer l'ordre des index
     if idx_min > idx_max:
         idx_min, idx_max = idx_max, idx_min
         point_min, point_max = point_max, point_min
@@ -745,7 +712,7 @@ def process_profiles_and_plot(demi_profils_value, demi_profils_coords_relatives,
 
     min_X = [0] * 1000
     crater_floor = [0] * 36
-    fig, ax = plt.subplots(figsize=(20, 7))
+    fig, ax = plt.subplots(figsize=(15, 7))
     plt.subplots_adjust(bottom=0.3)
 
     crater_morph = None
@@ -758,7 +725,7 @@ def process_profiles_and_plot(demi_profils_value, demi_profils_coords_relatives,
         full_profile, X, min_X = process_profile(
             demi_profils_value, demi_profils_coords_relatives, i, pixel_size_tb, min_X)
 
-        plt.figure(figsize=(20, 7))
+        plt.figure(figsize=(15, 7))
         plt.plot(X, full_profile, color='b', label='Profil')
         plt.xlabel("Distance (m)")
         plt.ylabel("Elevation")
@@ -780,25 +747,21 @@ def process_profiles_and_plot(demi_profils_value, demi_profils_coords_relatives,
         def set_morph_to_Bowl(event):
             nonlocal crater_morph
             crater_morph = "Bowl-shaped"
-            print(f"Le cratère {crater_id} de la zone RG{zone} est un bowl-shaped.")
             plt.close()
 
         def set_morph_to_Flat(event):
             nonlocal crater_morph
             crater_morph = "Flat-floored"
-            print(f"Le cratère {crater_id} de la zone RG{zone} est un flat-floored.")
             plt.close()
 
         def set_morph_to_Mound(event):
             nonlocal crater_morph
             crater_morph = "With a mound"
-            print(f"Le cratère {crater_id} de la zone RG{zone} a un mound.")
             plt.close()
 
         def set_morph_to_Unknown(event):
             nonlocal crater_morph
             crater_morph = "Unknown"
-            print(f"Le cratère {crater_id} de la zone RG{zone} est un unknown.")
             plt.close()
 
         ax.plot(X_test, full_profile, color=colors[i], marker='', label='Profil topographique', linewidth=0.5)
@@ -953,7 +916,7 @@ def visualisation3d(masked_image, crater_id, zone, swirl_on_or_off):
     X, Y = np.meshgrid(np.arange(cols), np.arange(rows))
 
     # Affichage en 3D
-    fig = plt.figure(figsize=(20, 7))
+    fig = plt.figure(figsize=(15, 7))
     ax = fig.add_subplot(111, projection='3d')
     ax.plot_surface(X, Y, masked_band, cmap='terrain', linewidth=0, antialiased=False)
 
