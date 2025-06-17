@@ -1,5 +1,5 @@
 ########################################################################################################################
-##################################################### IMPORTATIONS #####################################################
+##################################################### IMPORTS ##########################################################
 ########################################################################################################################
 
 import geopandas as gpd
@@ -10,12 +10,12 @@ from rasterio.mask import mask
 import numpy as np
 from shapely.geometry import Point, Polygon
 from tqdm import tqdm
-from Maximum_search import Finding_maxima, horizontal_90, horizontal_270, vertical_360, vertical_180
+from Maximum_search import find_maxima, horizontal_90, horizontal_270, vertical_360, vertical_180
 from Circularity import Miller_index
 from Slopes import max_crater_slopes_calculation, slopes_stopar_calculation
 from TRI import TRI
 from Topographical_profiles import main, visualisation3d
-from PDF_report import creer_rapport_cratere
+from PDF_report import create_crater_report
 
 
 ########################################################################################################################
@@ -98,7 +98,7 @@ for zone in zones:
 ########################################################################################################################
 ######################################################### CODE #########################################################
 ########################################################################################################################
-    folders = ["profils", "TRI", "crater_img", "rapports"]
+    folders = ["profiles", "TRI", "crater_img", "reports"]
     base_path = f"results/RG{zone}"
 
     for folder in folders:
@@ -174,12 +174,12 @@ for zone in zones:
             demi_profiles_coords_relatives = []  # Stores the relative coordinates of points in the profile
             index_maximum = []                   # Stores the index of the maximum point of each semi-profiles
 
-            lowest_point_coord, min_geom, not_enough_data = Finding_maxima(min_pos, min_val, D, masked_image,
-                                                                           out_transform, max_value, max_coord_relative,
-                                                                           max_coord_real, max_geom,
-                                                                           demi_profiles_value,
-                                                                           demi_profiles_coords_relatives,
-                                                                           index_maximum)
+            lowest_point_coord, min_geom, not_enough_data = find_maxima(min_pos, min_val, D, masked_image,
+                                                                        out_transform, max_value, max_coord_relative,
+                                                                        max_coord_real, max_geom,
+                                                                        demi_profiles_value,
+                                                                        demi_profiles_coords_relatives,
+                                                                        index_maximum)
 
             if len(max_geom) == 36 and not_enough_data == 0:
 
@@ -301,8 +301,8 @@ for zone in zones:
                                 slopes_stopar_geom,
                                 mean_slope_stopar,
                                 delta_stopar,
-                                hauteur_crete,
-                                fiabilite
+                                rim_height,
+                                reliability
                             ) = slopes_stopar_calculation(
                                 demi_profiles_value,
                                 demi_profiles_coords_relatives,
@@ -343,24 +343,24 @@ for zone in zones:
                                 state = "Unknown"
 
                             ### --- RAPORT --- ###
-                            creer_rapport_cratere(crater_id,
-                                                  zone,
-                                                  swirl_on_or_off,
-                                                  crater_morph,
-                                                  center_x,
-                                                  center_y,
-                                                  lowest_point_coord,
-                                                  moy_diam,
-                                                  round(delta_D_hoover, 0),
-                                                  prof_moyen_crat,
-                                                  round(delta_d_hoover, 1),
-                                                  ratio_dD,
-                                                  delta_dD_hoover,
-                                                  circularity,
-                                                  mean_slope_stopar,
-                                                  slopes_stopar,
-                                                  delta_stopar
-                                                  )
+                            create_crater_report(crater_id,
+                                                 zone,
+                                                 swirl_on_or_off,
+                                                 crater_morph,
+                                                 center_x,
+                                                 center_y,
+                                                 lowest_point_coord,
+                                                 moy_diam,
+                                                 round(delta_D_hoover, 0),
+                                                 prof_moyen_crat,
+                                                 round(delta_d_hoover, 1),
+                                                 ratio_dD,
+                                                 delta_dD_hoover,
+                                                 circularity,
+                                                 mean_slope_stopar,
+                                                 slopes_stopar,
+                                                 delta_stopar
+                                                 )
 
                             # Commune attributes
                             common_attrs = {
@@ -388,10 +388,10 @@ for zone in zones:
                                     'slopeStopar': slopes_stopar[i],
                                     'δStopar': delta_stopar[i],
                                     'meanStopar': mean_slope_stopar,
-                                    'rim_height': hauteur_crete[i],
-                                    'reliability': fiabilite[i],
-                                    'mean_rim_h': np.mean(hauteur_crete),
-                                    'mean_relia': np.mean(fiabilite)
+                                    'rim_height': rim_height[i],
+                                    'reliability': reliability[i],
+                                    'mean_rim_h': np.mean(rim_height),
+                                    'mean_relia': np.mean(reliability)
                                 })
 
                                 angle += 10
@@ -435,8 +435,8 @@ for zone in zones:
                                 'δ_dD_hoov': delta_dD_hoover,
                                 'circu': circularity,
                                 'mean_slope': mean_slope_stopar,
-                                'mean_rim_h': np.mean(hauteur_crete),
-                                'mean_relia': np.mean(fiabilite),
+                                'mean_rim_h': np.mean(rim_height),
+                                'mean_relia': np.mean(reliability),
                                 'swirl': swirl_on_or_off,
                                 'hiesinger': floor_age
                             })

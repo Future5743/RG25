@@ -3,122 +3,133 @@
 ########################################################################################################################
 
 import skimage as sk
-
 import rasterio
-
 import numpy as np
-
 from shapely.geometry import Point, LineString
 
 ########################################################################################################################
 ######################################################### CODE #########################################################
 ########################################################################################################################
 
-def Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value, max_coord_relative, max_coord_real,
-                   max_geom, line_geom, demi_profils_value, demi_profils_coords_relatives, index_maximum):
+def find_maxima(min_position, min_value, profile_length, masked_image, out_transform,
+                max_values, max_coords_relative, max_coords_real, max_geometries,
+                half_profiles_values, half_profiles_coords_relative, max_indices):
+    """
+    Identifies the local maxima along radial profiles (every 10°) from a minimum point
+    on a crater rim. Useful for crater rim profiling and analysis.
 
-    '''
-    This function find the maxima of the crater each 10°
+    Parameters
+    ----------
+    min_position : tuple
+        Coordinates of the lowest point (0, x, y) in the image.
 
-    Entries :
-        min_pos: tuple                          -- Relative coordinates of the crater's lowest point
-        min_val: float                          -- Elevation of the crater's lowest point
-        D: float                                -- Two times the len of the masked image
-        masked_image: ???                       -- ??
-        out_transform:???                       -- ??
-        max_value: list                         -- Contains all the elevations of the maxima on the rim
-        max_coord_relative: list                -- Contains all the relative coordinates of the maxima on the rim
-        max_coord_real: list                    -- Contains all the real coordinates of the maxima on the rim
-        max_geom: list                          -- Contains all the geometries of highest_points
-        line_geom: list                         -- Contains all the line geometries of the profiles studied
-        demi_profils_value: list                -- Contains th elevation value of each poin on the semi-profiles
-        demi_profils_coords_relatives: list     -- Contains the relative coordinates of each point on the semi-profiles
-        index_maximum: list                     -- Contains the index of the maximum point of each semi-profiles
+    min_value : float
+        Minimum elevation value (crater bottom).
 
-    Exit data :
-        lowest_point_coord: tupple              -- Real coordinates of the lowest point
-        min_geom: Point object                  -- Geometru of the lowest point
-    '''
+    profile_length : float
+        Length of the radial profile lines.
+
+    masked_image : np.ndarray
+        3D masked image array (e.g., from a DEM with a shape like [1, height, width]).
+
+    out_transform : affine.Affine
+        Affine transform used to convert pixel coordinates to spatial coordinates.
+
+    max_values : list
+        List to store the maximum values found along each profile.
+
+    max_coords_relative : list
+        List to store relative pixel coordinates of each maximum.
+
+    max_coords_real : list
+        List to store real-world coordinates (longitude, latitude) of each maximum.
+
+    max_geometries : list
+        List to store shapely Point geometries of each maximum.
+
+    half_profiles_values : list
+        List to store elevation values of each half-profile.
+
+    half_profiles_coords_relative : list
+        List to store relative pixel coordinates for each half-profile.
+
+    max_indices : list
+        List to store the index along each profile where the maximum occurs.
+
+    Returns
+    -------
+    lowest_point_coord : tuple
+        Real-world coordinates (longitude, latitude) of the lowest point.
+
+    min_geometry : shapely.geometry.Point
+        Shapely geometry of the lowest point.
+
+    not_enough_data : int
+        Flag (1 or 0) indicating whether a profile contains too much missing data.
+
+    Notes
+    -----
+    - Profiles are extracted every 10° around the lowest point.
+    - If a profile is too short (< 4 pixels) or its max is too close to the edge,
+      it is skipped.
+    - If maximum == minimum, the profile is considered potentially invalid.
+    """
 
     lowest_point_coord = None
-    min_geom = None
+    min_geometry = None
     not_enough_data = 0
 
-    # Initialisation de l'angle étudié pour former les profils
-    angle = 0
+    angle = 0  # Start angle in degrees
+    x0, y0 = min_position[1], min_position[2]  # Crater lowest point in pixel coords
 
-    # Attribition de variables pour les coordonnées relatives du lowest point
-    x0, y0 = min_pos[1], min_pos[2]
-
-    # Boucle pour étudier des profils tous les 10°
-    for i in range(36):
-
-        # Convertion de l'angle en radian
+    for _ in range(36):  # 360° / 10° = 36 profiles
         angle_rad = np.deg2rad(angle)
+        x1 = int(x0 + profile_length * np.cos(angle_rad))
+        y1 = int(y0 + profile_length * np.sin(angle_rad))
 
-        # Coordonnées des points à l'extremité du profil
-        x1 = int(x0 + D * np.cos(angle_rad))
-        y1 = int(y0 + D * np.sin(angle_rad))
-
-        # Ajustement du profil à masked_image
+        # Ensure endpoint is within image bounds
         while True:
             try:
                 masked_image[0, x1, y1]
                 break
             except:
-                D = D * 0.99  # Réduction de la longueur du profil de 1%
-                x1 = int(x0 + D * np.cos(angle_rad))
-                y1 = int(y0 + D * np.sin(angle_rad))
+                profile_length *= 0.99
+                x1 = int(x0 + profile_length * np.cos(angle_rad))
+                y1 = int(y0 + profile_length * np.sin(angle_rad))
 
-        # Définition de la ligne du profil étudié
         rr, cc = sk.draw.line(x0, y0, x1, y1)
+        half_profiles_coords_relative.append([rr, cc])
 
-        demi_profils_coords_relatives.append([rr, cc])
+        profile_values = masked_image[0, rr, cc]
+        half_profiles_values.append(list(profile_values))
 
-        line_value = masked_image[0, rr, cc]  # Extraction des altitudes de la ligne
+        angle += 10  # Increment angle by 10°
 
-        demi_profils_value.append(list(line_value))  # On ajoute chaque demi-profil à la liste profils
+        if profile_values.shape[0] > 3:
+            max_val = np.max(profile_values)
 
-        # Ajout de 10° à l'angle
-        angle += 10
+            # Avoid using edge values as max (possible artifacts)
+            while max_val in profile_values[-3:]:
+                max_indices_invalid = np.where(profile_values == max_val)
+                profile_values[max_indices_invalid] = -np.inf
+                max_val = np.max(profile_values)
 
-        # On exclue les cratères dont les lignes de profils contiennent moins de 3 pixels
-        if line_value.shape[0] > 3:
+            if max_val != min_value:
+                max_values.append(round(max_val, 4))
 
-            # Extraction de l'altitude maximale
-            maximum = np.max(line_value)
+                max_index = np.where(masked_image[0, rr, cc] == max_val)[0][0]
+                max_indices.append(max_index)
 
-            # Recalcul du maximum si celui-ci correspond à un des trois derniers pixels de la ligne de profil
-            while maximum == line_value[-1] or maximum == line_value[-2] or maximum == line_value[-3]:
-                index = np.where(line_value == maximum)
+                max_coord = (rr[max_index], cc[max_index])
+                max_coords_relative.append(max_coord)
 
-                line_value[index] = - np.inf
+                real_coord = rasterio.transform.xy(out_transform, *max_coord)
+                max_coords_real.append(real_coord)
 
-                maximum = np.max(line_value)
-
-            # Exclusion des cratères où l'altitude maximale d'un profil est égale à l'altitude minimale
-            # (peut correspondre à une erreur de détection de YOLOv5)
-            if maximum != min_val:
-                max_value.append(round(maximum, 4))
-
-                index_max = np.where(masked_image[0, rr, cc] == maximum)
-
-                index_maximum.append(index_max[0][0])
-
-                max_coordinates = (rr[index_max][0], cc[index_max][0])
-
-                max_coord_relative.append(max_coordinates)
-
-                max_real_coordinates = rasterio.transform.xy(out_transform, max_coordinates[0],
-                                                             max_coordinates[1])
-
-                max_coord_real.append(max_real_coordinates)
-
-                mask = line_value.mask  # masque des valeurs invalides ou masquées
-
+                mask = getattr(profile_values, 'mask', np.zeros_like(profile_values, dtype=bool))
                 nan_count = 0
 
-                for i in range(index_max[0][0]):
+                for i in range(max_index):
                     if mask[i]:
                         nan_count += 1
                     else:
@@ -127,14 +138,11 @@ def Finding_maxima(min_pos, min_val, D, masked_image, out_transform, max_value, 
                             nan_count = 0
 
                 lowest_point_coord = rasterio.transform.xy(out_transform, rr[0], cc[0])
-                limit_point_coord = rasterio.transform.xy(out_transform, rr[-1], cc[-1])
+                max_geometries.append(Point(real_coord))
+                min_geometry = Point(lowest_point_coord)
 
-                # Ajout des géométries dans leur liste correspondantes
-                max_geom.append(Point(max_real_coordinates[0], max_real_coordinates[1]))
-                min_geom = Point(lowest_point_coord[0], lowest_point_coord[1])
-                line_geom.append(LineString([lowest_point_coord, limit_point_coord]))
+    return lowest_point_coord, min_geometry, not_enough_data
 
-    return lowest_point_coord, min_geom, not_enough_data
 
 
 

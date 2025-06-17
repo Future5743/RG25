@@ -1,5 +1,5 @@
 ########################################################################################################################
-##################################################### IMPORTATIONS #####################################################
+##################################################### IMPORTS ##########################################################
 ########################################################################################################################
 
 import numpy as np
@@ -15,70 +15,99 @@ from shapely.geometry import LineString
 ########################################################################################################################
 ######################################################### CODE #########################################################
 ########################################################################################################################
+
 def distance_calculation(pos1, pos2, pixel_size):
     '''
-    This function compute the real distance between two points in meters.
+    Calculate the real distance (in meters) between two points given their relative coordinates and pixel size.
 
-    Entries:
-        pos1: list, array or tupple         -- Relative coordinates of the first point
-        pos2: list, array or tupple         -- Relative coordinates of the second point
-        pixel_size: int                     -- Size of the pixel on the terrain
+    Parameters:
+    -----------
+    pos1: list, array, or tuple
+        Relative coordinates of the first point (e.g., [x1, y1])
 
-    Exit data:
-        pixel_dist * pixel_size: float      -- Distance between the two points
+    pos2: list, array, or tuple
+        Relative coordinates of the second point (e.g., [x2, y2])
+
+    pixel_size: int or float
+        Size of one pixel on the terrain in meters
+
+    Returns:
+    --------
+    float
+        The real distance between the two points (meters)
     '''
-
     pixel_dist = np.sqrt((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
     return pixel_dist * pixel_size
 
 
-def max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size):
+def max_crater_slopes_calculation(max_values, max_coords_relative, pixel_size):
     '''
-    This function compute the maximum slope between two opposite sides of the crater
+    Calculate the maximum slope between opposite sides of a crater rim.
 
-    Entries:
-        max_value: list                        -- Contains all the elevations of the maxima on the rim
-        max_coord_relative: list               -- Contains all the relative coordinates of the maxima on the rim
-        pixel_size: int                        -- Size of the pixel on the terrain
+    Parameters:
+    -----------
+    max_values: list or array
+        Elevations of the maxima points on the crater rim
 
-    Exit data:
-        np.max(slopes): float                  -- Maximum slope between two opposite sides of the crater
+    max_coords_relative: list or array
+        Relative coordinates of the maxima points on the crater rim
+
+    pixel_size: int or float
+        Size of one pixel on the terrain in meters
+
+    Returns:
+    --------
+    float
+        Maximum slope (in degrees) between two opposite rim points
     '''
-
     slopes = []
-    for i in range(len(max_value) // 2):
-        dist = distance_calculation(max_coord_relative[i], max_coord_relative[i + 18], pixel_size)
-        delta_z = abs(max_value[i] - max_value[i + 18])
+    # Assuming the rim maxima are arranged so that points i and i+18 are opposite
+    for i in range(len(max_values) // 2):
+        dist = distance_calculation(max_coords_relative[i], max_coords_relative[i + 18], pixel_size)
+        delta_z = abs(max_values[i] - max_values[i + 18])
         slope_deg = np.rad2deg(np.arctan(delta_z / dist))
         slopes.append(round(slope_deg, 4))
     return np.max(slopes)
 
 
-def slopes_px2px(s, s_uncertainties, index_min_inner, index_max_inner, demi_profil, pixel_size, dz):
+def slopes_px2px(slopes_list, slopes_uncertainties, index_min_inner, index_max_inner, demi_profile, pixel_size, dz):
     '''
-    This function compute the slope following the method used in Stopar et al., 2017.
-    This method consist in compute the slope using all the points between rate and (1-rate) of the depth of the crater.
-    Then the depth is computed by averaging the slope between each adjacent points.
+    Calculate the average slope using the Stopar et al., 2017 method by computing slopes between adjacent points within a given profile range.
+    Uncertainties are also computed for each slope.
 
-    Entries:
-        s: list                             -- Contains the slopes computed (the slopes between adjacent points)
-        s_uncertainties: list               -- Contains the uncertainties associated with each slope computed (the
-                                               slopes between adjacent points)
-        index_min_inner: int                -- Index of the lowest point defining the boundary of the entire slope
-        index_max_inner: int                -- Index of the highest point defining the boundary of the entire slope
-        demi_profil: list                   -- Contains all the points defining the semi-profile
-        pixel_size: int                     -- Size of the pixel on the terrain
-        dz: float                           -- Vertical uncertainty
+    Parameters:
+    -----------
+    slopes_list: list
+        List to append slopes between adjacent points
 
-    Exit data:
-        mean_slope_px: float                -- The average slope computed with all the slopes between adjacent points
-        mean_uncertainty: float             -- The average uncertainty associated with each slope computed between
-                                               adjacent points
+    slopes_uncertainties: list
+        List to append uncertainties for each slope
+
+    index_min_inner: int
+        Starting index of the profile segment to analyze
+
+    index_max_inner: int
+        Ending index of the profile segment to analyze
+
+    demi_profile: list of lists or arrays
+        List of points defining the semi-profile; each point contains [x, y, elevation]
+
+    pixel_size: int or float
+        Size of one pixel on the terrain in meters
+
+    dz: float
+        Vertical uncertainty (elevation measurement error)
+
+    Returns:
+    --------
+    tuple of floats
+        mean_slope_px: average slope (degrees) over the profile segment
+
+        mean_uncertainty: average uncertainty associated with the slope calculation
     '''
-
     for j in range(index_min_inner, index_max_inner):
-        pt1 = demi_profil[j]
-        pt2 = demi_profil[j + 1]
+        pt1 = demi_profile[j]
+        pt2 = demi_profile[j + 1]
 
         dist = distance_calculation(pt1[:-1], pt2[:-1], pixel_size)
         if dist == 0:
@@ -87,15 +116,14 @@ def slopes_px2px(s, s_uncertainties, index_min_inner, index_max_inner, demi_prof
         depth = pt2[-1] - pt1[-1]
 
         slope = round(np.rad2deg(np.arctan(depth / dist)), 2)
-        s.append(slope)
+        slopes_list.append(slope)
 
-        # Suppose dz and pixel_size_uncertainty are known constants
-        slope_uncertainties(s_uncertainties, pt1, pt2, dist, pixel_size, dz)
+        # Compute uncertainty for the slope between pt1 and pt2
+        slope_uncertainties(slopes_uncertainties, pt1, pt2, dist, pixel_size, dz)
 
-    if s:
-        mean_slope_px = round(np.nanmean(s), 2)
-        mean_uncertainty = round(np.sqrt(np.nansum(np.array(s_uncertainties) ** 2)) / len(s_uncertainties), 2)
-
+    if slopes_list:
+        mean_slope_px = round(np.nanmean(slopes_list), 2)
+        mean_uncertainty = round(np.sqrt(np.nansum(np.array(slopes_uncertainties) ** 2)) / len(slopes_uncertainties), 2)
     else:
         mean_slope_px = np.nan
         mean_uncertainty = np.nan
@@ -103,22 +131,34 @@ def slopes_px2px(s, s_uncertainties, index_min_inner, index_max_inner, demi_prof
     return mean_slope_px, mean_uncertainty
 
 
-def slope_uncertainties(uncertainty_slope, point_1, point_2, dist, pixel_size, dz):
+def slope_uncertainties(uncertainties_list, point_1, point_2, dist, pixel_size, dz):
     '''
-    This function compute the uncertainties associated with the slope calculation.
+    Calculate the uncertainty associated with a slope computed between two points.
 
-    Entries:
-        uncertainty_slope: list             -- Contains the uncertainties associated with the slopes calculation
-        point_1: list                       -- Contains the coordinates and the elevation of the first studied point
-                                               (one of the two delimitations of the slope computed)
-        point_2: list                       -- Contains the coordinates and the elevation of the second studied point
-                                               (one of the two delimitations of the slope computed)
-        dist: float                         -- Distance between the two studied points
-        pixel_size: int                     -- Size of the pixel on the terrain
-        dz: float                           -- Vertical uncertainty
+    Parameters:
+    -----------
+    uncertainties_list: list
+        List to append the calculated slope uncertainty
 
-    Exit data:
-        No exit data
+    point_1: list or array
+        Coordinates and elevation of the first point [x, y, z]
+
+    point_2: list or array
+        Coordinates and elevation of the second point [x, y, z]
+
+    dist: float
+        Distance between the two points (meters)
+
+    pixel_size: int or float
+        Size of one pixel on the terrain (meters)
+
+    dz: float
+        Vertical uncertainty (elevation measurement error)
+
+    Returns:
+    --------
+    None
+        The function appends the uncertainty to uncertainties_list.
     '''
     x = point_1[0] - point_2[0]
     y = point_1[1] - point_2[1]
@@ -130,90 +170,140 @@ def slope_uncertainties(uncertainty_slope, point_1, point_2, dist, pixel_size, d
         (np.sqrt(2) * dz / dist) ** 2
     )
 
-    uncertainty_slope.append(round(delta_slope, 2))
+    uncertainties_list.append(round(delta_slope, 2))
 
 
-def point_profile_near_preimpact_surface(demi_profils_value, demi_profils_coords_relatives, elevation_preimpact):
+def point_profile_near_preimpact_surface(demi_profile_values, demi_profile_coords_relative, preimpact_elevation):
+    '''
+    Find the point on a semi-profile closest in elevation to a given pre-impact surface elevation.
 
+    Parameters:
+    -----------
+    demi_profile_values: list or array
+        Elevation values of the points along the semi-profile
+
+    demi_profile_coords_relative: list or array
+        Relative coordinates of the points along the semi-profile
+
+    preimpact_elevation: float
+        Elevation of the pre-impact surface
+
+    Returns:
+    --------
+    tuple:
+        point_pre_impact: list
+            The point [x, y, elevation] on the profile closest to the pre-impact elevation
+
+        idx_preimpact: int
+            Index of the closest point in the profile lists
+    '''
     point_pre_impact = None
     idx_preimpact = 0
-    dist_preimpact = np.inf
+    min_diff = np.inf
 
-    for i in range(len(demi_profils_value)):
-        if np.isnan(demi_profils_value[i]):
+    for i in range(len(demi_profile_values)):
+        if np.isnan(demi_profile_values[i]):
             continue
-        if abs(elevation_preimpact - demi_profils_value[i]) < dist_preimpact:
-            dist_preimpact, point_pre_impact, idx_preimpact = abs(elevation_preimpact - demi_profils_value[i]), \
-                                                              [demi_profils_coords_relatives[0][i],
-                                                               demi_profils_coords_relatives[1][i],
-                                                               demi_profils_value[i]],\
-                                                              i
+        diff = abs(preimpact_elevation - demi_profile_values[i])
+        if diff < min_diff:
+            min_diff = diff
+            point_pre_impact = [demi_profile_coords_relative[0][i],
+                                demi_profile_coords_relative[1][i],
+                                demi_profile_values[i]]
+            idx_preimpact = i
 
     return point_pre_impact, idx_preimpact
 
-def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives, max_coord_real, max_value, point_inner, idx_inner, crater_floor, pixel_size, dz,
-                              out_transform, no_data_value, zone):
+
+def slopes_stopar_calculation(demi_profile_values, demi_profile_coords_relative, max_coords_real, max_values, point_inner, idx_inner,
+                              crater_floor, pixel_size, dz, out_transform, no_data_value, zone):
     '''
-    This function compute the crater's slopes with the method used in Stopar et al., 2017.
+    Compute crater slopes using the Stopar et al. (2017) method and an adaptation of it.
 
-    To be more precise, the method used in Stopar et al., 2017 is returned to the slopes_px_to_px variable.
-    This method consist in compute the slope using all the points between rate and (1-rate) of the depth of the crater.
-    Then the depth is computed by averaging the slope between each adjacent points.
+    This function computes slopes pixel-to-pixel within crater profiles between specified boundaries.
+    It also calculates uncertainties and geometries related to these slopes.
 
-    This function compute also an adaptation of the method used in Stopar et al., 2017.
-    This methode only compute the slope with the point between rate and (1-rate) of the depth of the crater
+    Parameters:
+    -----------
+    demi_profile_values: list of lists or arrays
+        Elevation values of points on semi-profiles
 
-    Entries:
-        demi_profils_value: list                            -- Contains the elevation value of each point on the
-                                                               semi-profiles
-        demi_profils_coords_relatives: list                 -- Contains the relative coordinates of each point on the
-                                                               semi-profiles
-        pixel_size: int                                     -- Size of the pixel on the terrain
-        dz: float                                           -- Vertical uncertainty
-        out_transform: ???                                  -- ???
-        no_data_value: ???                                  -- ???
-        rate: float                                         -- The wanted percentage to compute the slope
+    demi_profile_coords_relative: list of lists or arrays
+        Relative coordinates of points on semi-profiles
 
-    Exit data:
-        slopes: list                                        -- Contains all the crater's slopes compute with an
-                                                               adaptation of the method used in Stopar et al., 2017
-        slopes_px_to_px: list                               -- Contains all the crater's slopes compute with the method
-                                                               used in Stopar et al., 2017
-        geom: list                                          -- Contains the geometry of all the slopes
-        round(np.mean(slopes), 2): float                    -- Mean of all the crater's slopes compute with the
-                                                               adaptation of the Stopar et al., 2017 method
-        round(np.mean(slopes_px_to_px), 2): float           -- Mean of all the crater's slopes compute pixel to pixel
-        uncertainty_slope: list                             -- Contains the uncertainties of all the crater's slopes
-                                                               compute with an adaptation of the method used in Stopar
-                                                               et al., 2017
-        uncertainty_slope_px_to_px: list                    -- Contains the uncertainties of all the crater's slopes
-                                                               compute with the method used in Stopar et al., 2017
+    max_coords_real: list of tuples
+        Real-world coordinates of maximum elevation points on crater rim
 
+    max_values: list or array
+        Elevations of the maximum points on the crater rim
+
+    point_inner: list
+        Inner boundary points for slope calculations
+
+    idx_inner: list of tuples
+        Indices defining the inner boundary range for slope calculation (start, end)
+
+    crater_floor: list
+        Indices of the crater floor points within the profiles
+
+    pixel_size: int or float
+        Size of one pixel on the terrain (meters)
+
+    dz: float
+        Vertical uncertainty (elevation measurement error)
+
+    out_transform: affine transform
+        Rasterio transform object to convert raster coordinates to real-world coordinates
+
+    no_data_value: float or int
+        Raster no-data value used to identify missing data
+
+    zone: str or int
+        Zone identifier for loading the appropriate raster files
+
+    Returns:
+    --------
+    tuple:
+        slopes_px_to_px: list
+            List of computed slopes pixel-to-pixel (degrees)
+
+        geom: list of shapely.geometry.LineString
+            Geometries representing slope lines between floor and inner points
+
+        mean_slope_px_to_px: float
+            Mean of all pixel-to-pixel slopes (degrees)
+
+        uncertainty_slope_px_to_px: list
+            List of uncertainties associated with pixel-to-pixel slopes
+
+        diff_pre_impact: list
+            Differences between rim maximum elevations and pre-impact surface elevations
+
+        fiabilite: list
+            Reliability values sampled from a raster
     '''
+
     raster_path = f"../data/RG/DTM_interpolate/RG{zone}_interpolation_IDW_02_crop.TIF"
-    raster_fiabilite_path = f"../data/RG/DTM_interpolate/RG{zone}_interpolation_IDW_02_crop_fiabilite.TIF"
+    raster_fiability_path = f"../data/RG/DTM_interpolate/RG{zone}_interpolation_IDW_02_crop_fiabilite.TIF"
 
-    with rasterio.open(raster_path) as raster_pre_impact, rasterio.open(raster_fiabilite_path) as raster_fiabilite:
+    with rasterio.open(raster_path) as raster_pre_impact, rasterio.open(raster_fiability_path) as raster_fiability:
         slopes_px_to_px = []
-
-        # Uncertainties
         uncertainty_slope_px_to_px = []
-
         geom = []
         elevation_pre_impact = []
         diff_pre_impact = []
         fiabilite = []
 
-        # Étape 1 : prétraitement pour décider la logique globale
-        for i, (profil_coords, profil_values) in enumerate(zip(demi_profils_coords_relatives, demi_profils_value)):
-            coord = max_coord_real[i]
+        # Step 1: Preprocessing to decide global logic
+        for i, (profil_coords, profil_values) in enumerate(zip(demi_profile_coords_relative, demi_profile_values)):
+            coord = max_coords_real[i]
             elevation = list(raster_pre_impact.sample([coord]))[0][0]
             elevation_pre_impact.append(elevation)
 
             point_preimpact, index_preimpact = point_profile_near_preimpact_surface(
-                demi_profils_value[i], demi_profils_coords_relatives[i], elevation)
+                demi_profile_values[i], demi_profile_coords_relative[i], elevation)
 
-            fiab = list(raster_fiabilite.sample([coord]))[0][0]
+            fiab = list(raster_fiability.sample([coord]))[0][0]
             fiabilite.append(fiab)
 
             m = len(profil_coords[0])
@@ -227,12 +317,11 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
             fiab = fiabilite[i]
 
             point_preimpact, index_preimpact = point_profile_near_preimpact_surface(
-                demi_profils_value[i], demi_profils_coords_relatives[i], elevation)
+                demi_profile_values[i], demi_profile_coords_relative[i], elevation)
 
-            diff_pre_impact.append(max_value[i] - elevation)
+            diff_pre_impact.append(max_values[i] - elevation)
 
-            floor = [profil_coords[0][crater_floor[i]], profil_coords[1][crater_floor[i]],
-                     profil_values[crater_floor[i]]]
+            floor = [profil_coords[0][crater_floor[i]], profil_coords[1][crater_floor[i]], profil_values[crater_floor[i]]]
 
             s = []
             s_uncertainties = []
@@ -243,9 +332,9 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
             )
 
             if mean_slope_px == 0:
-                print(f"Fiabilité: {fiab}")
-                print(f"point preimpact: {point_preimpact}")
-                print(f"Point au sol: {floor}")
+                print(f"Reliability: {fiab}")
+                print(f"Pre-impact point: {point_preimpact}")
+                print(f"Floor point: {floor}")
 
             slopes_px_to_px.append(mean_slope_px)
             uncertainty_slope_px_to_px.append(mean_uncertainty)
@@ -256,5 +345,3 @@ def slopes_stopar_calculation(demi_profils_value, demi_profils_coords_relatives,
             ]))
 
     return slopes_px_to_px, geom, round(np.mean(slopes_px_to_px), 2), uncertainty_slope_px_to_px, diff_pre_impact, fiabilite
-
-
