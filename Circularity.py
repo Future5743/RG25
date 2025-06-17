@@ -1,8 +1,8 @@
 ########################################################################################################################
-##################################################### IMPORTATIONS #####################################################
+##################################################### IMPORTS ##########################################################
 ########################################################################################################################
 
-import geopandas as gpd    # Import de la bibliothèque python "Geopandas". Permet de manipuler des données géographiques
+import geopandas as gpd
 import skimage as sk
 import os
 import shutil
@@ -15,35 +15,53 @@ from tqdm import tqdm
 ########################################################################################################################
 ######################################################### CODE #########################################################
 ########################################################################################################################
+
+
 def distance_calculation(pos1, pos2, pixel_size):
     '''
-    This function compute the real distance between two points in meters.
+    Calculates the real-world distance (in meters) between two points based on their relative positions and pixel size.
 
-    Entries:
-        pos1: list, array or tupple         -- Relative coordinates of the first point
-        pos2: list, array or tupple         -- Relative coordinates of the second point
-        pixel_size: int                     -- Size of the pixel on the terrain
+    Parameters:
+    -----------
+    pos1: list
+        Coordinates of the first point (relative to image/grid)
 
-    Exit data:
-        pixel_dist * pixel_size: float      -- Distance between the two points
+    pos2: list
+        Coordinates of the second point
+
+    pixel_size: float
+        Pixel resolution in meters (i.e., ground size of one pixel)
+
+    Returns:
+    --------
+    float: Distance between the two points in meters
     '''
-
     pixel_dist = np.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
     return pixel_dist * pixel_size
 
+
 def Miller_index(min_pos, max_coord_relative, pixel_size):
     '''
-    This function compute the Miller compactness index, used to estimate the circularity of any shape.
+    Calculates the Miller circularity index of a crater, based on its rim and lowest point geometry.
 
-    Entries:
-        min_pos: tuple                      -- Relative coordinates of the crater's lowest point
-        max_coord_relative: list            -- Contains all the relative coordinates of the maxima on the rim
-        pixel_size: float                   -- Size of the pixel on the terrain
+    The index helps assess how circular a shape is. A value near 1.0 indicates a more circular shape.
 
-    Exit data:
-        round(circularity, 4): float        -- Index representing the circularity of the studied shape.
-                                               The closer the index is to 1, the more the shape is considered circular
+    Parameters:
+    -----------
+    min_pos: tuple
+        Coordinates of the crater's lowest point (relative to image/grid)
+
+    max_coord_relative: list
+        List of coordinates for maximum elevation points along the rim
+
+    pixel_size: float
+        Pixel resolution in meters
+
+    Returns:
+    --------
+    float: Miller circularity index (rounded to 4 decimal places)
     '''
+
     perimeter = 0.0
     area = 0.0
 
@@ -52,22 +70,21 @@ def Miller_index(min_pos, max_coord_relative, pixel_size):
         min_pos.remove(0)
 
     for i in range(len(max_coord_relative) - 1):
-        # Triangle formé par min_pos, max[i], max[i+1]
+        # Triangle formed by min_pos, max[i], and max[i+1]
         a = distance_calculation(max_coord_relative[i], max_coord_relative[i + 1], pixel_size)
         b = distance_calculation(min_pos, max_coord_relative[i], pixel_size)
         c = distance_calculation(min_pos, max_coord_relative[i + 1], pixel_size)
 
-        # Formule de Héron pour la surface du triangle
+        # Heron's formula for triangle area
         s = (a + b + c) / 2
         try:
             triangle_area = np.sqrt(s * (s - a) * (s - b) * (s - c))
         except ValueError:
-            triangle_area = 0.0  # En cas de valeurs négatives dues à l'imprécision flottante
+            triangle_area = 0.0  # In case of invalid sqrt due to floating-point precision errors
 
         perimeter += a
         area += triangle_area
 
-    # Arrondir pour éviter division par zéro avec très petits périmètres
     perimeter = round(perimeter, 6)
     area = round(area, 6)
 
