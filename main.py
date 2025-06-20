@@ -26,13 +26,13 @@ zones = ['2']
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 zone_settings = {
-    '1': {'pixel_size_tb': 5, 'precision_error': 5.1},
     '2': {'pixel_size_tb': 2, 'precision_error': 0.81},
     '3': {'pixel_size_tb': 2, 'precision_error': 0.91},
     '4': {'pixel_size_tb': 2, 'precision_error': 0.87},
     '5': {'pixel_size_tb': 5, 'precision_error': 2.54},
     '6': {'pixel_size_tb': 5, 'precision_error': 2.34},
-    '7': {'pixel_size_tb': 5, 'precision_error': 2.37}
+    '7': {'pixel_size_tb': 5, 'precision_error': 2.37},
+    '8': {'pixel_size_tb': 5, 'precision_error': 1.89}
 }
 
 for zone in zones:
@@ -172,14 +172,12 @@ for zone in zones:
             max_geom = []                        # Stores geometries of highest_points
             demi_profiles_value = []             # Stores topographic profiles
             demi_profiles_coords_relatives = []  # Stores the relative coordinates of points in the profile
-            index_maximum = []                   # Stores the index of the maximum point of each semi-profiles
 
             lowest_point_coord, min_geom, not_enough_data = find_maxima(min_pos, min_val, D, masked_image,
                                                                         out_transform, max_value, max_coord_relative,
                                                                         max_coord_real, max_geom,
                                                                         demi_profiles_value,
-                                                                        demi_profiles_coords_relatives,
-                                                                        index_maximum)
+                                                                        demi_profiles_coords_relatives)
 
             if len(max_geom) == 36 and not_enough_data == 0:
 
@@ -284,10 +282,6 @@ for zone in zones:
 
         ### Add geometry from highest_points
                             rim_approx_geom = Polygon(max_coord_real)
-
-                            ### --- SLOPES CALCULATION --- ###
-
-                            visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
                             
                             ### --- CREATING TOPOGRAPHIC PROFILES --- ###
 
@@ -295,6 +289,10 @@ for zone in zones:
                                                                         demi_profiles_coords_relatives,
                                                                         pixel_size_tb, swirl_on_or_off, zone, crater_id,
                                                                         no_data_value, depth, min_val)
+
+                            ### --- SLOPES CALCULATION --- ###
+
+                            visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
 
                             (
                                 slopes_stopar,

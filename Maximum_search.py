@@ -13,7 +13,7 @@ from shapely.geometry import Point, LineString
 
 def find_maxima(min_position, min_value, profile_length, masked_image, out_transform,
                 max_values, max_coords_relative, max_coords_real, max_geometries,
-                half_profiles_values, half_profiles_coords_relative, max_indices):
+                half_profiles_values, half_profiles_coords_relative):
     """
     Identifies the local maxima along radial profiles (every 10°) from a minimum point
     on a crater rim. Useful for crater rim profiling and analysis.
@@ -52,9 +52,6 @@ def find_maxima(min_position, min_value, profile_length, masked_image, out_trans
 
     half_profiles_coords_relative : list
         List to store relative pixel coordinates for each half-profile.
-
-    max_indices : list
-        List to store the index along each profile where the maximum occurs.
 
     Returns
     -------
@@ -118,7 +115,6 @@ def find_maxima(min_position, min_value, profile_length, masked_image, out_trans
                 max_values.append(round(max_val, 4))
 
                 max_index = np.where(masked_image[0, rr, cc] == max_val)[0][0]
-                max_indices.append(max_index)
 
                 max_coord = (rr[max_index], cc[max_index])
                 max_coords_relative.append(max_coord)

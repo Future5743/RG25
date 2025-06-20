@@ -173,50 +173,8 @@ def slope_uncertainties(uncertainties_list, point_1, point_2, dist, pixel_size, 
     uncertainties_list.append(round(delta_slope, 2))
 
 
-def point_profile_near_preimpact_surface(demi_profile_values, demi_profile_coords_relative, preimpact_elevation):
-    '''
-    Find the point on a semi-profile closest in elevation to a given pre-impact surface elevation.
-
-    Parameters:
-    -----------
-    demi_profile_values: list or array
-        Elevation values of the points along the semi-profile
-
-    demi_profile_coords_relative: list or array
-        Relative coordinates of the points along the semi-profile
-
-    preimpact_elevation: float
-        Elevation of the pre-impact surface
-
-    Returns:
-    --------
-    tuple:
-        point_pre_impact: list
-            The point [x, y, elevation] on the profile closest to the pre-impact elevation
-
-        idx_preimpact: int
-            Index of the closest point in the profile lists
-    '''
-    point_pre_impact = None
-    idx_preimpact = 0
-    min_diff = np.inf
-
-    for i in range(len(demi_profile_values)):
-        if np.isnan(demi_profile_values[i]):
-            continue
-        diff = abs(preimpact_elevation - demi_profile_values[i])
-        if diff < min_diff:
-            min_diff = diff
-            point_pre_impact = [demi_profile_coords_relative[0][i],
-                                demi_profile_coords_relative[1][i],
-                                demi_profile_values[i]]
-            idx_preimpact = i
-
-    return point_pre_impact, idx_preimpact
-
-
-def slopes_stopar_calculation(demi_profile_values, demi_profile_coords_relative, max_coords_real, max_values, point_inner, idx_inner,
-                              crater_floor, pixel_size, dz, out_transform, no_data_value, zone):
+def slopes_stopar_calculation(demi_profile_values, demi_profile_coords_relative, max_coords_real, max_values,
+                              point_inner, idx_inner, crater_floor, pixel_size, dz, out_transform, no_data_value, zone):
     '''
     Compute crater slopes using the Stopar et al. (2017) method and an adaptation of it.
 
@@ -282,9 +240,8 @@ def slopes_stopar_calculation(demi_profile_values, demi_profile_coords_relative,
         fiabilite: list
             Reliability values sampled from a raster
     '''
-
-    raster_path = f"../data/RG/DTM_interpolate/RG{zone}_interpolation_IDW_02_crop.TIF"
-    raster_fiability_path = f"../data/RG/DTM_interpolate/RG{zone}_interpolation_IDW_02_crop_fiabilite.TIF"
+    raster_path = f"../data/RG/DTM_interpolate/Linear/RG{zone}_interpolation_robuste_02.TIF"
+    raster_fiability_path = f"../data/RG/DTM_interpolate/IDW/RG{zone}_interpolation_IDW_02_crop_fiabilite.TIF"
 
     with rasterio.open(raster_path) as raster_pre_impact, rasterio.open(raster_fiability_path) as raster_fiability:
         slopes_px_to_px = []
@@ -300,24 +257,12 @@ def slopes_stopar_calculation(demi_profile_values, demi_profile_coords_relative,
             elevation = list(raster_pre_impact.sample([coord]))[0][0]
             elevation_pre_impact.append(elevation)
 
-            point_preimpact, index_preimpact = point_profile_near_preimpact_surface(
-                demi_profile_values[i], demi_profile_coords_relative[i], elevation)
-
             fiab = list(raster_fiability.sample([coord]))[0][0]
             fiabilite.append(fiab)
 
             m = len(profil_coords[0])
             demi_profil = [[profil_coords[0][j], profil_coords[1][j], profil_values[j]] for j in range(m)]
             demi_profil = np.where(demi_profil == no_data_value, np.nan, demi_profil)
-
-            profil_values_clean = np.array(profil_values)
-            profil_values_clean = profil_values_clean[~np.isnan(profil_values_clean)]
-
-            elevation = elevation_pre_impact[i]
-            fiab = fiabilite[i]
-
-            point_preimpact, index_preimpact = point_profile_near_preimpact_surface(
-                demi_profile_values[i], demi_profile_coords_relative[i], elevation)
 
             diff_pre_impact.append(max_values[i] - elevation)
 
@@ -331,11 +276,6 @@ def slopes_stopar_calculation(demi_profile_values, demi_profile_coords_relative,
                 demi_profil, pixel_size, dz
             )
 
-            if mean_slope_px == 0:
-                print(f"Reliability: {fiab}")
-                print(f"Pre-impact point: {point_preimpact}")
-                print(f"Floor point: {floor}")
-
             slopes_px_to_px.append(mean_slope_px)
             uncertainty_slope_px_to_px.append(mean_uncertainty)
 
@@ -344,4 +284,5 @@ def slopes_stopar_calculation(demi_profile_values, demi_profile_coords_relative,
                 rasterio.transform.xy(out_transform, point_inner[i][1][0], point_inner[i][1][1])
             ]))
 
-    return slopes_px_to_px, geom, round(np.mean(slopes_px_to_px), 2), uncertainty_slope_px_to_px, diff_pre_impact, fiabilite
+    return slopes_px_to_px, geom, round(np.mean(slopes_px_to_px), 2), uncertainty_slope_px_to_px, diff_pre_impact, \
+           fiabilite

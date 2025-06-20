@@ -851,51 +851,62 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
             crater_floor[i] = idx1
             crater_floor[i + 18] = idx2
 
-        # If morphology is unknown, open a Tkinter dialog to get further user input
-        if crater_morph == "Unknown":
-
+        def ask_crater_morph_change(crater_morph):
             def on_yes():
-                # Show additional buttons if "Yes" is pressed
-                btn_bowl.pack(pady=5)
-                btn_flat.pack(pady=5)
-                btn_mound.pack(pady=5)
+                for btn in morphology_buttons.values():
+                    btn.pack(pady=5)
 
             def on_no():
-                root.destroy()  # Close the window
+                root.destroy()
 
             def on_choice(choice):
-                nonlocal crater_morph
+                nonlocal crater_morph, crater_floor
                 crater_morph = choice
-
                 if choice == "Bowl-shaped":
                     crater_floor = [0] * 36
-                root.destroy()  # Close window after choice
+                root.destroy()
 
-            # Create main window
+            # Initialisation de la fenêtre
             root = tk.Tk()
             root.title("User Choice")
 
-            # Question label
-            label_question = tk.Label(root, text="Have you changed your mind about the crater morphology?",
-                                      font=("Helvetica", 12))
+            # Label principal
+            label_question = tk.Label(
+                root,
+                text="Have you changed your mind about the crater morphology?",
+                font=("Helvetica", 12)
+            )
             label_question.pack(pady=15)
 
-            # Yes and No buttons
+            # Boutons Oui / Non
             btn_yes = tk.Button(root, text="Yes", width=20, command=on_yes)
             btn_yes.pack(pady=5)
 
             btn_no = tk.Button(root, text="No", width=20, command=on_no)
             btn_no.pack(pady=5)
 
-            # Additional morphology choice buttons (initially hidden)
-            btn_bowl = tk.Button(root, text="Bowl-shaped", width=20, command=lambda: on_choice("Bowl-shaped"))
-            btn_flat = tk.Button(root, text="Flat-floored", width=20, command=lambda: on_choice("Flat-floored"))
-            btn_mound = tk.Button(root, text="With a mound", width=20, command=lambda: on_choice("With a mound"))
+            # Dictionnaire des boutons selon le contexte
+            morphology_buttons = {}
+
+            if crater_morph == "Unknown":
+                options = ["Bowl-shaped", "Flat-floored", "With a mound"]
+            elif crater_morph == "Flat-floored":
+                options = ["Bowl-shaped", "With a mound", "Unknown"]
+            elif crater_morph == "With a mound":
+                options = ["Bowl-shaped", "Flat-floored", "Unknown"]
+            else:
+                options = []
+
+            for option in options:
+                btn = tk.Button(root, text=option, width=20, command=lambda opt=option: on_choice(opt))
+                morphology_buttons[option] = btn
 
             root.mainloop()
+            return crater_morph
+
+        crater_morph = ask_crater_morph_change(crater_morph)
 
     return crater_floor, crater_morph
-
 
 
 def main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swirl_on_or_off, zone, crater_id,
@@ -958,7 +969,6 @@ def main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swi
     )
 
     return crater_floor, points_inner_20, index_inner_20, crater_morph
-
 
 
 def visualisation3d(masked_image, crater_id, zone, swirl_on_or_off):
