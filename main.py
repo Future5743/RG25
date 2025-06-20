@@ -22,17 +22,17 @@ from PDF_report import create_crater_report
 ##################################################### DATA OPENING #####################################################
 ########################################################################################################################
 
-zones = ['2']
+zones = [2, 5, 7]
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 zone_settings = {
-    '2': {'pixel_size_tb': 2, 'precision_error': 0.81},
-    '3': {'pixel_size_tb': 2, 'precision_error': 0.91},
-    '4': {'pixel_size_tb': 2, 'precision_error': 0.87},
-    '5': {'pixel_size_tb': 5, 'precision_error': 2.54},
-    '6': {'pixel_size_tb': 5, 'precision_error': 2.34},
-    '7': {'pixel_size_tb': 5, 'precision_error': 2.37},
-    '8': {'pixel_size_tb': 5, 'precision_error': 1.89}
+    2: {'pixel_size_tb': 2, 'precision_error': 0.81},
+    3: {'pixel_size_tb': 2, 'precision_error': 0.91},
+    4: {'pixel_size_tb': 2, 'precision_error': 0.87},
+    5: {'pixel_size_tb': 5, 'precision_error': 2.54},
+    6: {'pixel_size_tb': 5, 'precision_error': 2.34},
+    7: {'pixel_size_tb': 5, 'precision_error': 2.37},
+    8: {'pixel_size_tb': 5, 'precision_error': 1.89}
 }
 
 for zone in zones:
@@ -298,9 +298,7 @@ for zone in zones:
                                 slopes_stopar,
                                 slopes_stopar_geom,
                                 mean_slope_stopar,
-                                delta_stopar,
-                                rim_height,
-                                reliability
+                                delta_stopar
                             ) = slopes_stopar_calculation(
                                 demi_profiles_value,
                                 demi_profiles_coords_relatives,
@@ -385,11 +383,7 @@ for zone in zones:
                                     'position': f'Ligne à {angle}°',
                                     'slopeStopar': slopes_stopar[i],
                                     'δStopar': delta_stopar[i],
-                                    'meanStopar': mean_slope_stopar,
-                                    'rim_height': rim_height[i],
-                                    'reliability': reliability[i],
-                                    'mean_rim_h': np.mean(rim_height),
-                                    'mean_relia': np.mean(reliability)
+                                    'meanStopar': mean_slope_stopar
                                 })
 
                                 angle += 10
@@ -433,8 +427,6 @@ for zone in zones:
                                 'δ_dD_hoov': delta_dD_hoover,
                                 'circu': circularity,
                                 'mean_slope': mean_slope_stopar,
-                                'mean_rim_h': np.mean(rim_height),
-                                'mean_relia': np.mean(reliability),
                                 'swirl': swirl_on_or_off,
                                 'hiesinger': floor_age
                             })

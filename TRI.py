@@ -169,13 +169,28 @@ def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zo
     output_dir = f'results/RG{zone}/crater_img'
     os.makedirs(output_dir, exist_ok=True)
 
+    raster_image_path = f"../data/RG/Orthophoto/Orthophoto_RG{zone}.tiff"
+    with rasterio.open(raster_image_path) as src_img:
+        out_img, out_transform_img = mask(src_img, polygon, crop=True)
+        img_meta = src_img.meta
+        nodata_val_img = img_meta.get("nodata", None)
+
+    # Initialize mask for image
+    mask_pixels_img = np.zeros_like(out_img[0], dtype=bool)
+
+    if nodata_val_img is not None:
+        mask_pixels_img |= np.any(out_img == nodata_val_img, axis=0)
+
+    if np.issubdtype(out_img.dtype, np.floating):
+        mask_pixels_img |= np.any(np.isnan(out_img), axis=0)
+
     # Prepare the image for saving (either RGB or grayscale)
-    if out_image.shape[0] >= 3:
+    if out_img.shape[0] >= 3:
         # RGB
-        image_array = np.transpose(out_image[:3], (1, 2, 0))
+        image_array = np.transpose(out_img[:3], (1, 2, 0))
 
         if image_array.dtype != np.uint8:
-            valid_pixels = ~mask_pixels
+            valid_pixels = ~mask_pixels_img
             valid_vals = image_array[valid_pixels]
 
             if valid_vals.size == 0:
@@ -190,15 +205,15 @@ def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zo
                 else:
                     image_array = ((image_array - nan_min) / ptp * 255).astype(np.uint8)
 
-        image_array[mask_pixels] = [0, 0, 0]
+        image_array[mask_pixels_img] = [0, 0, 0]
         image = Image.fromarray(image_array)
 
     else:
         # Grayscale
-        image_array = out_image[0]
+        image_array = out_img[0]
 
         if image_array.dtype != np.uint8:
-            valid_pixels = ~mask_pixels
+            valid_pixels = ~mask_pixels_img
             valid_vals = image_array[valid_pixels]
 
             if valid_vals.size == 0:
@@ -213,10 +228,10 @@ def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zo
                 else:
                     image_array = ((image_array - nan_min) / ptp * 255).astype(np.uint8)
 
-        image_array[mask_pixels] = 0
+        image_array[mask_pixels_img] = 0
         image = Image.fromarray(image_array)
 
-    # Save PNG image
+    # Save PNG image (outside all conditionals — image is guaranteed to be defined)
     output_path = os.path.join(output_dir, f'crater_{id}.png')
     image.save(output_path)
 

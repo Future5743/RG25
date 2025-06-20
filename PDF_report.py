@@ -262,20 +262,20 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
     # === Logos gauche et droite ===
     banner(c, page_width, page_height, bandeau_height)
 
-    ESPACEMENT_SOUS_TITRE = 1 * cm  # ou 20 si tu travailles en points
+    ESPACEMENT_SOUS_TITRE = 1 * cm
 
-    # === Titre centré ===
+    # === Title ===
     c.setFont("Helvetica-Bold", 25)
-    c.drawCentredString(page_width / 2, page_height - bandeau_height - 1 * cm, f"Rapport sur le cratère {id}")
-    c.drawCentredString(page_width / 2, page_height - bandeau_height - 1 * cm - 1 * cm, f"de la zone RG{zone}")
+    c.drawCentredString(page_width / 2, page_height - bandeau_height - 1 * cm, f"Crater report {id}")
+    c.drawCentredString(page_width / 2, page_height - bandeau_height - 1 * cm - 1 * cm, f"of RG{zone}")
 
-    # === Sous-titre "Informations générales" ===
+    # === New part: General information ===
     c.setFont("Helvetica-Bold", 16)
     sous_titre_y = page_height - bandeau_height - 1 * cm - 1 * cm - 2 * cm  # 2 lignes de titre + 2 cm de marge
-    c.drawString(marge_gauche, sous_titre_y, "Informations générales")
+    c.drawString(marge_gauche, sous_titre_y, "General information")
 
     image_path = f"results/RG{zone}/crater_img/crater_{id}.png"
-    # === Image ===
+
     with Image.open(image_path) as img:
         img_width_px, img_height_px = img.size
         aspect_ratio = img_height_px / img_width_px
@@ -286,29 +286,27 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
         c.drawImage(image_path, x_img, y_img, width=img_target_width, height=img_target_height,
                     preserveAspectRatio=True)
 
-    # === Texte à droite de l'image ===
     x_text = x_img + img_target_width + 1 * cm
     y_text = y_img + img_target_height
     text_max_width = page_width - x_text - marge_droite
     font_size = 11
-    line_spacing = 16  # 14 + 2 points d'espace vertical entre blocs
+    line_spacing = 16
 
     infos = [
         ("ID", id),
-        ("Zone d'étude", f"RG{zone}"),
+        ("Study area", f"RG{zone}"),
         ("Swirl", swirl),
-        ("Morphologie", morph),
-        ("Diamètre moyen", f"{int(diam)}m ± {incer_D_hoov}m"),
-        ("Profondeur moyenne", f"{'%.1f' % round(d, 1)}m ± {incer_d_hoov}m"),
-        ("Ratio d/D", f"{dtoD} ± {incer_dD_hoov}"),
-        ("Indice de circularité", f"{mill}"),
-        ("Pente moyenne", f"{mean_slope}"),
-        ("Coordonnées du centre géométrique", f"({center_long}, {center_lat})"),
-        ("Coordonnées du point le plus bas du cratère", f"{coord_low}")
+        ("Morphology", morph),
+        ("Mean Diameter", f"{int(diam)}m ± {incer_D_hoov}m"),
+        ("Mean depht", f"{'%.1f' % round(d, 1)}m ± {incer_d_hoov}m"),
+        ("d/D ratio", f"{dtoD} ± {incer_dD_hoov}"),
+        ("Circularity index", f"{mill}"),
+        ("Mean slope", f"{mean_slope}"),
+        ("Geometric center coordinates", f"({center_long}, {center_lat})"),
+        ("Coordinates of the crater's lowest point", f"{coord_low}")
     ]
 
     for label, value in infos:
-        # Préparer lignes avec wrapping
         full_text = f"{label} : {value}"
         lines = wrap_text(c, full_text, text_max_width, font_name="Helvetica", font_size=font_size)
 
@@ -318,26 +316,22 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
                 label_part = line[:split_index + 1]
                 value_part = line[split_index + 1:].lstrip()
 
-                # Écrire label en gras
                 c.setFont("Helvetica-Bold", font_size)
                 c.drawString(x_text, y_text, label_part)
 
-                # Écrire valeur normale juste après le label
                 x_value = x_text + c.stringWidth(label_part, "Helvetica-Bold", font_size) + 2
                 c.setFont("Helvetica", font_size)
                 c.drawString(x_value, y_text, value_part)
             else:
-                # Si ligne sans ":" (cas rare), tout en normal
                 c.setFont("Helvetica", font_size)
                 c.drawString(x_text, y_text, line)
             y_text -= line_spacing
 
-        # Ajouter espace entre les blocs d’infos
         y_text -= 4
 
-    # === 6. Sous-titre "Informations sur les pentes" ===
+    # Nez part: general information on slopes ===
     y_sous_titre_2 = y_text - ESPACEMENT_SOUS_TITRE
-    show_subtitle = True  # Flag pour ne l'afficher qu'une fois
+    show_subtitle = True
 
     if y_sous_titre_2 < 3 * cm:
         c.showPage()
@@ -347,14 +341,14 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
 
     if show_subtitle:
         c.setFont("Helvetica-Bold", 16)
-        c.drawString(marge_gauche, y_sous_titre_2, "Informations sur les pentes")
+        c.drawString(marge_gauche, y_sous_titre_2, "Slopes data")
         y_table = y_sous_titre_2 - 1 * cm  # 1 cm sous le sous-titre
         show_subtitle = False
     else:
         y_table = y_sous_titre_2
 
-    table_data = [["Orientation par rapport au Nord", "Pente (°)", "Incertitude (°)"]]
-    angles = list(range(0, 36))  # 0 à 350°, tous les 10°
+    table_data = [["North orientation“, ”Slope (°)“, ”Uncertainty (°)"]]
+    angles = list(range(0, 36))
     for angle in angles:
         if angle == 0:
             table_data.append([f"{angle * 10}/360°", slope[angle], delta_slope[angle]])
@@ -362,41 +356,35 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
             table_data.append([f"{angle * 10}°", slope[angle], delta_slope[angle]])
 
     table_font_size = 10
-    # Largeur totale disponible pour le tableau
     table_width = page_width - marge_gauche - marge_droite
-    col_widths = [table_width * 0.4, table_width * 0.3, table_width * 0.3]  # 40% / 30% / 30%
+    col_widths = [table_width * 0.4, table_width * 0.3, table_width * 0.3]
     row_height = 0.7 * cm
 
     y_table = y_sous_titre_2 - ESPACEMENT_SOUS_TITRE
 
     for row_index, row in enumerate(table_data):
-        # Vérifie si on a encore de la place sur la page
         if y_table < 2.5 * cm:
             c.showPage()
             banner(c, page_width, page_height, bandeau_height)
 
-            y_table = page_height - bandeau_height - 1 * cm  # recommencer 1cm sous le bandeau
+            y_table = page_height - bandeau_height - 1 * cm
 
         x = marge_gauche
         for i, cell in enumerate(row):
             c.setFont("Helvetica-Bold" if row_index == 0 else "Helvetica", table_font_size)
-            c.rect(x, y_table, col_widths[i], row_height)  # Bordure
-            c.drawString(x + 2, y_table + 0.2 * cm, str(cell))  # Texte dans cellule
+            c.rect(x, y_table, col_widths[i], row_height)
+            c.drawString(x + 2, y_table + 0.2 * cm, str(cell))
             x += col_widths[i]
         y_table -= row_height
 
-    # Dans ta fonction principale, à partir de y_table :
-
     y_sous_titre_tri = y_table - ESPACEMENT_SOUS_TITRE
 
-    # Texte long justifié à afficher sous le sous-titre
     long_text = "L'indice TRI est un indice permettant de blablabla bla. Lorem ipsum lorem ipsum. hiefneianslbf phsefib" \
                 "bslvbskib ohsgshrpvnfb shvlihvgsihv hp;sovbns"
 
-    # hauteur minimale restante sous le sous-titre
     remaining_height = y_sous_titre_tri
 
-    # Charger l'image pour calcul hauteur
+    # Load image for height calculation
     indice_tri_image_path = f"results/RG{zone}/TRI/TRI_{id}.png"
     with Image.open(indice_tri_image_path) as tri_img:
         img_width_px, img_height_px = tri_img.size
@@ -404,27 +392,25 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
         img_target_width = page_width - marge_gauche - marge_droite
         img_target_height = img_target_width * aspect_ratio
 
-    # Estimation hauteur texte (approximative, 14 pts par ligne)
     font_size_text = 12
     line_height = font_size_text + 2
     max_text_width = page_width - marge_gauche - marge_droite
-    # On calcule nombre de lignes en divisant la largeur totale des mots par max width
-    text_lines_count = (len(long_text) * font_size_text) // max_text_width + 3  # approximation grossière
+
+    text_lines_count = (len(long_text) * font_size_text) // max_text_width + 3
 
     text_height = text_lines_count * line_height
 
-    # 1. Toujours écrire le sous-titre + texte sur la page actuelle
-    if y_sous_titre_tri < 5 * cm:  # marge de sécurité avant d’écrire du texte
+    if y_sous_titre_tri < 5 * cm:
         c.showPage()
         banner(c, page_width, page_height, bandeau_height)
 
         y_sous_titre_tri = page_height - bandeau_height - ESPACEMENT_SOUS_TITRE
 
-    # Sous-titre
+    # === New part: Topographic profiles ===
     c.setFont("Helvetica-Bold", 16)
     c.drawString(marge_gauche, y_sous_titre_tri, "Topographic roughness index (TRI)")
 
-    # Texte justifié sous le sous-titre
+    # Justified text under subtitle
     y_text_start = y_sous_titre_tri - ESPACEMENT_SOUS_TITRE
     y_after_text = draw_justified_text(
         c, long_text, marge_gauche, y_text_start,
@@ -432,45 +418,42 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
         font_size=font_size_text, line_height=line_height
     )
 
-    # 2. Calculer si l’image rentre sur cette page (sous le texte)
+    # Computation to see if the picture is between two pages
     if y_after_text - img_target_height - 1 * cm < 2.5 * cm:
-        # Trop bas, donc image sur nouvelle page
         c.showPage()
         banner(c, page_width, page_height, bandeau_height)
 
         y_img_tri = page_height - bandeau_height - 1 * cm - img_target_height
     else:
-        # Elle rentre sous le texte
         y_img_tri = y_after_text - 0.5 * cm
 
-    # Image centrée
+    # Centered picture
     x_img_tri = marge_gauche + ((page_width - marge_gauche - marge_droite) - img_target_width) / 2
     c.drawImage(indice_tri_image_path, x_img_tri, y_img_tri, width=img_target_width, height=img_target_height,
                 preserveAspectRatio=True, mask='auto')
 
-    # === Sous-titre "Profils topographiques" ===
+    # === New part: Topographic profiles ===
     ESPACEMENT_SOUS_TITRE = 1 * cm
 
     estimated_image_height = 5 * cm
     if y_img_tri - estimated_image_height - ESPACEMENT_SOUS_TITRE < 3 * cm:
         c.showPage()
-        # === Bandeau noir ===
         banner(c, page_width, page_height, bandeau_height)
         y_profils = page_height - bandeau_height - ESPACEMENT_SOUS_TITRE
     else:
         y_profils = y_img_tri - ESPACEMENT_SOUS_TITRE
 
-    # Afficher le sous-titre
+    # Display of the subtitle
     c.setFont("Helvetica-Bold", 16)
-    c.drawString(marge_gauche, y_profils, "Profils topographiques")
+    c.drawString(marge_gauche, y_profils, "Topographic profiles")
     y_profils -= ESPACEMENT_SOUS_TITRE
 
-    # === Affichage des 18 images ===
+    # === Display of 18 images ===
     profils_dir = f"results/RG{zone}/profiles/{swirl}/{id}"
     for i in range(0, 18):
         image_path = os.path.join(profils_dir, f"Profile_{i*10}_{(i+18)*10}.png")
         if not os.path.exists(image_path):
-            print(f"⚠️ Image manquante : {image_path}")
+            print(f"⚠️ Missing picture : {image_path}")
             continue
         try:
             with Image.open(image_path) as img:
@@ -479,10 +462,9 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
                 aspect_ratio = img_height_px / img_width_px
                 img_target_height = img_target_width * aspect_ratio
 
-                # Vérifie si image tient sur la page actuelle
+                # Checks if image fits on current page
                 if y_profils - img_target_height < 2.5 * cm:
                     c.showPage()
-                    # === Bandeau noir ===
                     banner(c, page_width, page_height, bandeau_height)
 
                     y_profils = page_height - bandeau_height - ESPACEMENT_SOUS_TITRE
@@ -497,7 +479,7 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
             print(f"❌ Erreur chargement {image_path} : {e}")
 
 
-    # === Finalisation ===
+    # === Finalization ===
     c.showPage()
-    c.save()  # <== AJOUTE CETTE LIGNE
+    c.save()
     print(f"✅ Rapport PDF généré : {output_path}")
