@@ -11,9 +11,8 @@ from shapely.geometry import Point, LineString
 ######################################################### CODE #########################################################
 ########################################################################################################################
 
-def find_maxima(min_position, min_value, profile_length, masked_image, out_transform,
-                max_values, max_coords_relative, max_coords_real, max_geometries,
-                half_profiles_values, half_profiles_coords_relative):
+
+def find_maxima(min_position, min_value, masked_image, out_transform):
     """
     Identifies the local maxima along radial profiles (every 10°) from a minimum point
     on a crater rim. Useful for crater rim profiling and analysis.
@@ -35,6 +34,17 @@ def find_maxima(min_position, min_value, profile_length, masked_image, out_trans
     out_transform : affine.Affine
         Affine transform used to convert pixel coordinates to spatial coordinates.
 
+    Returns
+    -------
+    lowest_point_coord : tuple
+        Real-world coordinates (longitude, latitude) of the lowest point.
+
+    min_geometry : shapely.geometry.Point
+        Shapely geometry of the lowest point.
+
+    not_enough_data : int
+        Flag (1 or 0) indicating whether a profile contains too much missing data.
+
     max_values : list
         List to store the maximum values found along each profile.
 
@@ -53,17 +63,6 @@ def find_maxima(min_position, min_value, profile_length, masked_image, out_trans
     half_profiles_coords_relative : list
         List to store relative pixel coordinates for each half-profile.
 
-    Returns
-    -------
-    lowest_point_coord : tuple
-        Real-world coordinates (longitude, latitude) of the lowest point.
-
-    min_geometry : shapely.geometry.Point
-        Shapely geometry of the lowest point.
-
-    not_enough_data : int
-        Flag (1 or 0) indicating whether a profile contains too much missing data.
-
     Notes
     -----
     - Profiles are extracted every 10° around the lowest point.
@@ -71,6 +70,12 @@ def find_maxima(min_position, min_value, profile_length, masked_image, out_trans
       it is skipped.
     - If maximum == minimum, the profile is considered potentially invalid.
     """
+    max_values = [0] * 36                               # Stores altitude values for highest_points
+    max_coords_relative = [0] * 36                      # Stores relative coordinates of highest_points
+    max_coords_real = [0] * 36                          # Stores the actual coordinates of the highest_points
+    max_geometries = [0] * 36                           # Stores geometries of highest_points
+    half_profiles_values = [0] * 36                     # Stores topographic profiles
+    half_profiles_coords_relative = [0] * 36            # Stores the relative coordinates of points in the profile
 
     lowest_point_coord = None
     min_geometry = None
@@ -79,48 +84,74 @@ def find_maxima(min_position, min_value, profile_length, masked_image, out_trans
     angle = 0  # Start angle in degrees
     x0, y0 = min_position[1], min_position[2]  # Crater lowest point in pixel coords
 
-    for _ in range(36):  # 360° / 10° = 36 profiles
+    height, width = masked_image.shape[1:3]
+
+    for a in range(36):
+
         angle_rad = np.deg2rad(angle)
-        x1 = int(x0 + profile_length * np.cos(angle_rad))
-        y1 = int(y0 + profile_length * np.sin(angle_rad))
+        dx = np.cos(angle_rad)
+        dy = np.sin(angle_rad)
 
-        # Ensure endpoint is within image bounds
-        while True:
-            try:
-                masked_image[0, x1, y1]
-                break
-            except:
-                profile_length *= 0.99
-                x1 = int(x0 + profile_length * np.cos(angle_rad))
-                y1 = int(y0 + profile_length * np.sin(angle_rad))
+        # Calcul du t maximal pour rester dans l'image
+        t_values = []
 
+        if dx != 0:
+            if dx > 0:
+                t_right = (width - 1 - y0) / dx
+                t_values.append(t_right)
+            else:
+                t_left = -y0 / dx
+                t_values.append(t_left)
+
+        if dy != 0:
+            if dy > 0:
+                t_bottom = (height - 1 - x0) / dy
+                t_values.append(t_bottom)
+            else:
+                t_top = -x0 / dy
+                t_values.append(t_top)
+
+        t_max = min(t_values)
+
+        x1 = int(round(x0 + t_max * dy))
+        y1 = int(round(y0 + t_max * dx))
+
+        # Trace la ligne jusqu’au bord de l’image
         rr, cc = sk.draw.line(x0, y0, x1, y1)
-        half_profiles_coords_relative.append([rr, cc])
+        half_profiles_coords_relative[(a + 9) % 36] = [rr, cc]
 
         profile_values = masked_image[0, rr, cc]
-        half_profiles_values.append(list(profile_values))
 
-        angle += 10  # Increment angle by 10°
+        mask = getattr(profile_values, 'mask', np.zeros_like(profile_values, dtype=bool))
 
-        if profile_values.shape[0] > 3:
-            max_val = np.max(profile_values)
+        len_without_mask = [val for val in mask if not val]
+
+        half_profiles_values[(a + 9) % 36] = list(profile_values)
+
+        angle += 10
+
+        if len(len_without_mask) > 3:
+
+            max_val = np.nanmax(profile_values)
 
             # Avoid using edge values as max (possible artifacts)
+
             while max_val in profile_values[-3:]:
                 max_indices_invalid = np.where(profile_values == max_val)
                 profile_values[max_indices_invalid] = -np.inf
                 max_val = np.max(profile_values)
 
             if max_val != min_value:
-                max_values.append(round(max_val, 4))
+
+                max_values[(a + 9) % 36] = round(max_val, 4)
 
                 max_index = np.where(masked_image[0, rr, cc] == max_val)[0][0]
 
                 max_coord = (rr[max_index], cc[max_index])
-                max_coords_relative.append(max_coord)
+                max_coords_relative[(a + 9) % 36] = max_coord
 
                 real_coord = rasterio.transform.xy(out_transform, *max_coord)
-                max_coords_real.append(real_coord)
+                max_coords_real[(a + 9) % 36] = real_coord
 
                 mask = getattr(profile_values, 'mask', np.zeros_like(profile_values, dtype=bool))
                 nan_count = 0
@@ -134,10 +165,18 @@ def find_maxima(min_position, min_value, profile_length, masked_image, out_trans
                             nan_count = 0
 
                 lowest_point_coord = rasterio.transform.xy(out_transform, rr[0], cc[0])
-                max_geometries.append(Point(real_coord))
+
+                max_geometries[(a + 9) % 36] = Point(real_coord)
+
                 min_geometry = Point(lowest_point_coord)
 
-    return lowest_point_coord, min_geometry, not_enough_data
+    max_values = [x for x in max_values if x != 0]
+    max_coords_relative = [x for x in max_coords_relative if x != 0]
+    max_coords_real = [x for x in max_coords_real if x != 0]
+    max_geometries = [x for x in max_geometries if x != 0]
+
+    return lowest_point_coord, min_geometry, not_enough_data, max_values, max_coords_relative, max_coords_real, \
+           max_geometries, half_profiles_values, half_profiles_coords_relative
 
 
 

@@ -22,7 +22,7 @@ from PDF_report import create_crater_report
 ##################################################### DATA OPENING #####################################################
 ########################################################################################################################
 
-zones = [2, 5, 7]
+zones = [7]
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 zone_settings = {
@@ -161,23 +161,18 @@ for zone in zones:
                 min_val = round(masked_image.min(), 4)
                 min_pos = np.unravel_index(masked_image.argmin(), masked_image.shape)
 
-            D = masked_image.shape[1] * 2
-
             ### --- HIGH ELEVATION --- ###
 
-            # Initialize lists to store future data
-            max_value = []                       # Stores altitude values for highest_points
-            max_coord_relative = []              # Stores relative coordinates of highest_points
-            max_coord_real = []                  # Stores the actual coordinates of the highest_points
-            max_geom = []                        # Stores geometries of highest_points
-            demi_profiles_value = []             # Stores topographic profiles
-            demi_profiles_coords_relatives = []  # Stores the relative coordinates of points in the profile
-
-            lowest_point_coord, min_geom, not_enough_data = find_maxima(min_pos, min_val, D, masked_image,
-                                                                        out_transform, max_value, max_coord_relative,
-                                                                        max_coord_real, max_geom,
-                                                                        demi_profiles_value,
-                                                                        demi_profiles_coords_relatives)
+            (lowest_point_coord,
+             min_geom,
+             not_enough_data,
+             max_value,
+             max_coord_relative,
+             max_coord_real,
+             max_geom,
+             demi_profiles_value,
+             demi_profiles_coords_relatives
+             ) = find_maxima(min_pos, min_val, masked_image, out_transform)
 
             if len(max_geom) == 36 and not_enough_data == 0:
 
@@ -226,20 +221,52 @@ for zone in zones:
                 # Calculation of the radius of the average diameter
                 ray_largest_diam = round(moy_diam / 2, 1)
 
-                dist_lowest_point_center = np.sqrt((lowest_point_coord[0] - coord_center[0]) ** 2
-                                                   + (lowest_point_coord[1] - coord_center[1]) ** 2) * pixel_size_tb
-
                 print("✅ The diameter calculation done")
+
+                ### --- BARYCENTER --- ###
+
+                def barycenter(points):
+                    n = len(points)
+
+                    A = 0
+                    Cx = 0
+                    Cy = 0
+
+                    for i in range (n):
+                        x0, y0 = points[i]
+                        x1, y1 = points[(i+1) % n]
+                        cross = x0 * y1 - x1 * y0
+                        A += cross
+                        Cx += (x0 + x1) * cross
+                        Cy += (y0 + y1) * cross
+                    A = A * 0.5
+
+                    if A == 0:
+                        raise ValueError("The polygon area is null")
+
+                    Cx /= (6 * A)
+                    Cy /= (6 * A)
+
+                    return Cx, Cy
+
+                x_bary, y_bary = barycenter(max_coord_real)
+
+                dist_lowest_point_center = np.sqrt(
+                    (x_bary - lowest_point_coord[0])**2
+                    + (y_bary - lowest_point_coord[1])**2
+                )
+
+                geom_bary = Point([x_bary, y_bary])
 
                 if dist_lowest_point_center < moy_diam * 0.25 and moy_diam >= 40:
 
                     ### --- CIRCULARITY --- ###
-                    circularity = Miller_index(min_pos, max_coord_relative, pixel_size_tb)
+                    circularity = Miller_index(max_coord_real)
                     circularity = round(circularity, 2)
 
                     print("✅ Circularity calculation done")
 
-                    if 0.99 <= circularity <= 1:
+                    if 0.98 <= circularity <= 1:
 
                         ### --- SLOPES --- ###
 
@@ -254,8 +281,7 @@ for zone in zones:
                                 buffer_poly = center.buffer(radius, resolution=num_points)
                                 return buffer_poly
 
-                            buf_diam_max = buffer_diam_max(lowest_point_coord[0], lowest_point_coord[1],
-                                                           ray_largest_diam)
+                            buf_diam_max = buffer_diam_max(x_bary, y_bary, ray_largest_diam)
 
                             ### --- AVERAGE CRATER DEPTH --- ###
 
@@ -298,7 +324,9 @@ for zone in zones:
                                 slopes_stopar,
                                 slopes_stopar_geom,
                                 mean_slope_stopar,
-                                delta_stopar
+                                delta_stopar,
+                                rim_height,
+                                reliability_rim_height
                             ) = slopes_stopar_calculation(
                                 demi_profiles_value,
                                 demi_profiles_coords_relatives,
@@ -314,7 +342,7 @@ for zone in zones:
                                 zone
                             )
 
-                            print("✅ SLopes calculation done")
+                            print("✅ Slopes calculation done")
 
                             ### --- TRI ALGORITHM --- ###
                             TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
@@ -324,27 +352,38 @@ for zone in zones:
 
                             ### --- AUTOMATIC CLASSIFICATION --- ###
 
-                            if ratio_dD > 1/5 and np.max(slopes_stopar) > 35:
+                            state = "Unknown"
+                            slope_max = np.max(slopes_stopar)
+
+                            if ratio_dD > 1 / 5 and slope_max > 35:
                                 state = "A"
-                            if 1/7 < ratio_dD < 1/5 and 25 < np.max(slopes_stopar) < 35:
+                            elif 1 / 7 < ratio_dD <= 1 / 5 and 25 < slope_max <= 35:
                                 state = "AB"
-
-                            if 1/10 < ratio_dD < 1/7 and 15 < np.max(slopes_stopar) < 25:
+                            elif 1 / 10 < ratio_dD <= 1 / 7 and 15 < slope_max <= 25:
                                 state = "B"
-
-                            if ratio_dD < 1/10 and np.max(slopes_stopar) < 15:
+                            elif 1/12 < ratio_dD < 1 / 10 and 10 < slope_max <= 15:
+                                state = "BC"
+                            elif ratio_dD < 1 / 12 and slope_max < 10:
                                 state = "C"
+                            elif ratio_dD > 1/7 and slope_max > 25:
+                                state = "A - AB"
+                            elif 1/10 < ratio_dD <= 1/5 and 15 < slope_max <= 35:
+                                state = "AB - B"
+                            elif 1/12 < ratio_dD < 1/7 and 10 < slope_max < 25:
+                                state = "B - BC"
+                            elif ratio_dD < 1 / 10 and slope_max < 15:
+                                state = "BC - C"
 
-                            else:
-                                state = "Unknown"
+                            print(f"〽️Degradation : {state}")
 
                             ### --- RAPORT --- ###
                             create_crater_report(crater_id,
                                                  zone,
                                                  swirl_on_or_off,
                                                  crater_morph,
-                                                 center_x,
-                                                 center_y,
+                                                 state,
+                                                 x_bary,
+                                                 y_bary,
                                                  lowest_point_coord,
                                                  moy_diam,
                                                  round(delta_D_hoover, 0),
@@ -383,17 +422,21 @@ for zone in zones:
                                     'position': f'Ligne à {angle}°',
                                     'slopeStopar': slopes_stopar[i],
                                     'δStopar': delta_stopar[i],
-                                    'meanStopar': mean_slope_stopar
+                                    'meanStopar': mean_slope_stopar,
+                                    "rim_height": rim_height[i],
+                                    "reliability": reliability_rim_height[i],
+                                    "mean_rim_h": np.mean(rim_height),
+                                    "mean_reliab": np.mean(reliability_rim_height)
                                 })
 
                                 angle += 10
 
                             # Crater's center
                             centers.append({
-                                'geometry': coord_center_geom,
+                                'geometry': geom_bary,
                                 **common_attrs,
-                                'center_lon': center_x,
-                                'center_lat': center_y
+                                'center_lon': x_bary,
+                                'center_lat': y_bary
                             })
 
                             # Lowest point
@@ -427,6 +470,8 @@ for zone in zones:
                                 'δ_dD_hoov': delta_dD_hoover,
                                 'circu': circularity,
                                 'mean_slope': mean_slope_stopar,
+                                "mean_rim_h": np.mean(rim_height),
+                                "mean_reliab": np.mean(reliability_rim_height),
                                 'swirl': swirl_on_or_off,
                                 'hiesinger': floor_age
                             })
@@ -458,6 +503,19 @@ for zone in zones:
                                     'position': "point droite"
                                 }
                             ])
+                        else:
+                            print("❌ Does not meet the 8° condition")
+                            continue
+                    else:
+                        print("❌ Does not respect circularity")
+                        continue
+                else:
+                    print("❌ Does not comply with minimum diameter or distance between barycentre and min point")
+                    continue
+
+            else:
+                print("❌ There are no 36 profiles")
+                continue
 
 ########################################################################################################################
 ##################################################### RESULTS DATA #####################################################

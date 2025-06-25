@@ -178,7 +178,7 @@ def banner(c, page_width, page_height, bandeau_height):
         print(f"⚠️ Error loading logo: {e}")
 
 
-def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_low,
+def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat, coord_low,
                           diam, incer_D_hoov, d, incer_d_hoov,
                           dtoD, incer_dD_hoov, mill, mean_slope, slope, delta_slope):
     """
@@ -297,11 +297,12 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
         ("Study area", f"RG{zone}"),
         ("Swirl", swirl),
         ("Morphology", morph),
+        ("State of degradation", state),
         ("Mean Diameter", f"{int(diam)}m ± {incer_D_hoov}m"),
         ("Mean depht", f"{'%.1f' % round(d, 1)}m ± {incer_d_hoov}m"),
         ("d/D ratio", f"{dtoD} ± {incer_dD_hoov}"),
         ("Circularity index", f"{mill}"),
-        ("Mean slope", f"{mean_slope}"),
+        ("Mean slope", f"{mean_slope}°"),
         ("Geometric center coordinates", f"({center_long}, {center_lat})"),
         ("Coordinates of the crater's lowest point", f"{coord_low}")
     ]
@@ -347,7 +348,7 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
     else:
         y_table = y_sous_titre_2
 
-    table_data = [["North orientation“, ”Slope (°)“, ”Uncertainty (°)"]]
+    table_data = [["North orientation","Slope (°)", "Uncertainty (°)"]]
     angles = list(range(0, 36))
     for angle in angles:
         if angle == 0:
@@ -379,8 +380,8 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
 
     y_sous_titre_tri = y_table - ESPACEMENT_SOUS_TITRE
 
-    long_text = "L'indice TRI est un indice permettant de blablabla bla. Lorem ipsum lorem ipsum. hiefneianslbf phsefib" \
-                "bslvbskib ohsgshrpvnfb shvlihvgsihv hp;sovbns"
+    long_text = "The Topographic Roughness Index (TRI) is a measure used to quantify the ruggedeness or the " \
+                "unevenness of terrain. It reflects how much elevation change over a given area."
 
     remaining_height = y_sous_titre_tri
 
@@ -392,7 +393,7 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
         img_target_width = page_width - marge_gauche - marge_droite
         img_target_height = img_target_width * aspect_ratio
 
-    font_size_text = 12
+    font_size_text = 11
     line_height = font_size_text + 2
     max_text_width = page_width - marge_gauche - marge_droite
 
@@ -476,10 +477,10 @@ def create_crater_report(id, zone, swirl, morph, center_long, center_lat, coord_
                 y_profils -= img_target_height + ESPACEMENT_SOUS_TITRE
 
         except Exception as e:
-            print(f"❌ Erreur chargement {image_path} : {e}")
+            print(f"❌ Loading error {image_path} : {e}")
 
 
     # === Finalization ===
     c.showPage()
     c.save()
-    print(f"✅ Rapport PDF généré : {output_path}")
+    print(f"✅ PDF report generated : {output_path}")

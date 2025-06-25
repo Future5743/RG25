@@ -234,51 +234,50 @@ def slopes_stopar_calculation(demi_profile_values, demi_profile_coords_relative,
         uncertainty_slope_px_to_px: list
             List of uncertainties associated with pixel-to-pixel slopes
     '''
-    # raster_path = f"../data/RG/DTM_interpolate/Linear/RG{zone}_interpolation_robuste_02.TIF"
-    # raster_fiability_path = f"../data/RG/DTM_interpolate/IDW/RG{zone}_interpolation_IDW_02_crop_fiabilite.TIF"
+    raster_path = f"../data/RG/DTM_interpolate/Linear/RG{zone}_linear_interpolation_crop.TIF"
+    raster_fiability_path = f"../data/RG/DTM_interpolate/Linear/RG{zone}_linear_interpolation_fiabilite_crop.TIF"
 
-    # with rasterio.open(raster_path) as raster_pre_impact, rasterio.open(raster_fiability_path) as raster_fiability:
-    #     elevation_pre_impact = []
-    #     diff_pre_impact = []
-    #     fiabilite = []
+    with rasterio.open(raster_path) as raster_pre_impact, rasterio.open(raster_fiability_path) as raster_fiability:
+        elevation_pre_impact = []
+        diff_pre_impact = []
+        fiabilite = []
 
-    # ⚠️If you want to use the pre-impact feature, please make an indent after this line until you reach the return
-    slopes_px_to_px = []
-    uncertainty_slope_px_to_px = []
-    geom = []
 
-    # Step 1: Preprocessing to decide global logic
-    for i, (profil_coords, profil_values) in enumerate(zip(demi_profile_coords_relative, demi_profile_values)):
-        # coord = max_coords_real[i]
-        # elevation = list(raster_pre_impact.sample([coord]))[0][0]
-        # elevation_pre_impact.append(elevation)
+        slopes_px_to_px = []
+        uncertainty_slope_px_to_px = []
+        geom = []
 
-        # fiab = list(raster_fiability.sample([coord]))[0][0]
-        # fiabilite.append(fiab)
+        for i, (profil_coords, profil_values) in enumerate(zip(demi_profile_coords_relative, demi_profile_values)):
+            coord = max_coords_real[i]
+            elevation = list(raster_pre_impact.sample([coord]))[0][0]
+            elevation_pre_impact.append(elevation)
 
-        m = len(profil_coords[0])
-        demi_profil = [[profil_coords[0][j], profil_coords[1][j], profil_values[j]] for j in range(m)]
-        demi_profil = np.where(demi_profil == no_data_value, np.nan, demi_profil)
+            fiab = list(raster_fiability.sample([coord]))[0][0]
+            fiabilite.append(fiab)
 
-        # diff_pre_impact.append(max_values[i] - elevation)
+            m = len(profil_coords[0])
+            demi_profil = [[profil_coords[0][j], profil_coords[1][j], profil_values[j]] for j in range(m)]
+            demi_profil = np.where(demi_profil == no_data_value, np.nan, demi_profil)
 
-        floor = [profil_coords[0][crater_floor[i]], profil_coords[1][crater_floor[i]], profil_values[crater_floor[i]]]
+            diff_pre_impact.append(max_values[i] - elevation)
 
-        s = []
-        s_uncertainties = []
+            floor = [profil_coords[0][crater_floor[i]], profil_coords[1][crater_floor[i]], profil_values[crater_floor[i]]]
 
-        mean_slope_px, mean_uncertainty = slopes_px2px(
-            s, s_uncertainties, crater_floor[i], idx_inner[i][1],
-            demi_profil, pixel_size, dz
-        )
+            s = []
+            s_uncertainties = []
 
-        slopes_px_to_px.append(mean_slope_px)
-        uncertainty_slope_px_to_px.append(mean_uncertainty)
+            mean_slope_px, mean_uncertainty = slopes_px2px(
+                s, s_uncertainties, crater_floor[i], idx_inner[i][1],
+                demi_profil, pixel_size, dz
+            )
 
-        geom.append(LineString([
-            rasterio.transform.xy(out_transform, floor[0], floor[1]),
-            rasterio.transform.xy(out_transform, point_inner[i][1][0], point_inner[i][1][1])
-        ]))
+            slopes_px_to_px.append(mean_slope_px)
+            uncertainty_slope_px_to_px.append(mean_uncertainty)
 
-    return slopes_px_to_px, geom, round(np.mean(slopes_px_to_px), 2), uncertainty_slope_px_to_px, # diff_pre_impact, \
-           # fiabilite
+            geom.append(LineString([
+                rasterio.transform.xy(out_transform, floor[0], floor[1]),
+                rasterio.transform.xy(out_transform, point_inner[i][1][0], point_inner[i][1][1])
+            ]))
+
+    return slopes_px_to_px, geom, round(np.mean(slopes_px_to_px), 2), uncertainty_slope_px_to_px, diff_pre_impact, \
+           fiabilite

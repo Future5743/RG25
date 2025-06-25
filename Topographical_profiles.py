@@ -497,7 +497,6 @@ def save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
         ]
         ax_final.legend(handles=legend_elements)
 
-        fig_final.savefig(build_save_path(zone, swirl_on_or_off, crater_id, i=i, suffix=""))
         plt.close(fig_final)
         plt.close(fig)
 
@@ -508,25 +507,6 @@ def save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
     plt.show()
 
     selected_indices = sorted(selected_indices)
-
-    # ---------------- AUTOMATIC SAVING ----------------
-
-    # Second derivative
-    idx_l = int(np.argmin(np.abs(X_slice - floor_left)))
-    idx_r = int(np.argmin(np.abs(X_slice - floor_right)))
-
-    plt.figure(figsize=(15, 7))
-    plt.scatter(X_slice[idx_l], second_derivative[idx_l], color='green', zorder=5)
-    plt.scatter(X_slice[idx_r], second_derivative[idx_r], color='green', zorder=5)
-    plt.plot(X_slice, second_derivative, color='red', label='Second derivative')
-    plt.scatter(X_slice, second_derivative, color='red', s=80)
-    plt.xlabel("Distance (m)")
-    plt.ylabel("Second derivative")
-    plt.title(f'Second derivative for angles {i * 10}° to {(i + 18) * 10}°')
-    plt.grid(True)
-    plt.legend()
-    plt.savefig(build_save_path(zone, swirl_on_or_off, crater_id, i=i, suffix="_second_derivative"))
-    plt.close()
 
     return limit_profile - selected_indices[0], selected_indices[1] - limit_profile
 

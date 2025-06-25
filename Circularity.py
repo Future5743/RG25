@@ -17,7 +17,7 @@ from tqdm import tqdm
 ########################################################################################################################
 
 
-def distance_calculation(pos1, pos2, pixel_size):
+def distance_calculation(pos1, pos2):
     '''
     Calculates the real-world distance (in meters) between two points based on their relative positions and pixel size.
 
@@ -37,10 +37,10 @@ def distance_calculation(pos1, pos2, pixel_size):
     float: Distance between the two points in meters
     '''
     pixel_dist = np.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
-    return pixel_dist * pixel_size
+    return pixel_dist
 
 
-def Miller_index(min_pos, max_coord_relative, pixel_size):
+def Miller_index(max_coord_real):
     '''
     Calculates the Miller circularity index of a crater, based on its rim and lowest point geometry.
 
@@ -65,31 +65,22 @@ def Miller_index(min_pos, max_coord_relative, pixel_size):
     perimeter = 0.0
     area = 0.0
 
-    min_pos = list(min_pos)
-    if 0 in min_pos:
-        min_pos.remove(0)
+    for i in range(len(max_coord_real)):
 
-    for i in range(len(max_coord_relative) - 1):
-        # Triangle formed by min_pos, max[i], and max[i+1]
-        a = distance_calculation(max_coord_relative[i], max_coord_relative[i + 1], pixel_size)
-        b = distance_calculation(min_pos, max_coord_relative[i], pixel_size)
-        c = distance_calculation(min_pos, max_coord_relative[i + 1], pixel_size)
+        x0, y0 = max_coord_real[i]
 
-        # Heron's formula for triangle area
-        s = (a + b + c) / 2
-        try:
-            triangle_area = np.sqrt(s * (s - a) * (s - b) * (s - c))
-        except ValueError:
-            triangle_area = 0.0  # In case of invalid sqrt due to floating-point precision errors
+        x1, y1 = max_coord_real[(i+1) % len(max_coord_real)]
 
-        perimeter += a
-        area += triangle_area
+        area += (x0*y1 - x1*y0)
+
+        perimeter += distance_calculation([x0, y0], [x1, y1])
 
     perimeter = round(perimeter, 6)
-    area = round(area, 6)
+    area = round(abs(area) / 2, 6)
 
     if perimeter == 0:
         return 0.0
 
     circularity = (4 * np.pi * area) / (perimeter ** 2)
+
     return round(circularity, 4)
