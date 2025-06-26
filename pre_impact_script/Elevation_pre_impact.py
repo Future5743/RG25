@@ -25,7 +25,7 @@ def idw_interpolation(xy, values, xi, power=2, k=12):
     return weighted_values / weights_sum
 
 
-def comble_trous_dtm(input_raster_path, output_raster_path, method='cubic', smooth=True, sigma=1, idw_power=2):
+def interpolation_dtm(input_raster_path, output_raster_path, method='linear', smooth=True, sigma=1, idw_power=2):
     ds = gdal.Open(input_raster_path)
     band = ds.GetRasterBand(1)
     nodata = band.GetNoDataValue()
@@ -103,13 +103,12 @@ zones = [2,3,4,5,6,7,8]
 
 for zone in zones:
 
-    comble_trous_dtm(
+    interpolation_dtm(
         input_raster_path=f"../../data/RG/DTM_crop/RG{zone}_clip_02.TIF",
         output_raster_path=f"../../data/RG/DTM_interpolate/Linear/RG{zone}_linear_interpolation.TIF",
         method='linear',
         smooth=True,
-        sigma=1,
-        idw_power=4
+        sigma=1
     )
 
     crop(raster_path=f"../../data/RG/DTM_interpolate/Linear/RG{zone}_linear_interpolation.TIF",

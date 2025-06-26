@@ -8,9 +8,9 @@ import shutil
 import rasterio
 from rasterio.mask import mask
 import numpy as np
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Point, Polygon, LineString
 from tqdm import tqdm
-from Maximum_search import find_maxima, horizontal_90, horizontal_270, vertical_360, vertical_180
+from Maximum_search import find_maxima
 from Circularity import Miller_index
 from Slopes import max_crater_slopes_calculation, slopes_stopar_calculation
 from TRI import TRI
@@ -178,22 +178,6 @@ for zone in zones:
 
                 print("✅ The maximum points calculation done")
 
-            ### ELEVATION HAUTE : Horizontal - 90° (vers la droite dans le plan en 2-Dimensions)
-
-                max_val_right, point_haut_horiz_90 = horizontal_90(min_pos, masked_image, no_data_value, out_transform)
-
-            # ELEVATION HAUTE : Horizontal - 270° (vers la gauche dans le plan en 2-Dimensions)
-
-                max_val_left, point_haut_horiz_270 = horizontal_270(min_pos, masked_image, no_data_value, out_transform)
-
-            # ELEVATION HAUTE : Vertical - 360° (vers le haut dans le plan en 2-Dimensions)
-
-                max_val_top, point_haut_vert_360 = vertical_360 (min_pos, masked_image, no_data_value, out_transform)
-
-            # ELEVATION HAUTE : Vertical - 180° (vers le bas dans le plan en 2-Dimensions)
-
-                max_val_bas, point_haut_vert_180 = vertical_180(min_pos, masked_image, no_data_value, out_transform)
-
                 ### --- DIAMETERS --- ###
                 D = []
 
@@ -273,6 +257,8 @@ for zone in zones:
                         max_slope_crater = max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size_tb)
 
                         if max_slope_crater < 8:
+
+                            print(f"✅ The maximum slope between to opposite point on the rim is {max_slope_crater}")
 
                             ### --- CREATION OF A CIRCLE ADJUSTED TO CRATER DIMENSIONS --- ###
 
@@ -397,6 +383,7 @@ for zone in zones:
                                                  delta_stopar
                                                  )
 
+
                             # Commune attributes
                             common_attrs = {
                                 'run_id': crater_id,
@@ -476,33 +463,6 @@ for zone in zones:
                                 'hiesinger': floor_age
                             })
 
-                            # Point for the 90° profiles
-                            profile_90.extend([
-                                {
-                                    'geometry': point_haut_vert_360,
-                                    **common_attrs,
-                                    'max_alt': round(max_val_top, 1),
-                                    'position': "point haut"
-                                },
-                                {
-                                    'geometry': point_haut_vert_180,
-                                    **common_attrs,
-                                    'max_alt': round(max_val_bas, 1),
-                                    'position': "point bas"
-                                },
-                                {
-                                    'geometry': point_haut_horiz_270,
-                                    **common_attrs,
-                                    'max_alt': round(max_val_left, 1),
-                                    'position': "point gauche"
-                                },
-                                {
-                                    'geometry': point_haut_horiz_90,
-                                    **common_attrs,
-                                    'max_alt': round(max_val_right, 1),
-                                    'position': "point droite"
-                                }
-                            ])
                         else:
                             print("❌ Does not meet the 8° condition")
                             continue
@@ -528,12 +488,12 @@ for zone in zones:
         (results_slopes,                f'2_results_slopes_RG{zone}'),
         (highest_points,                f'3_results_max_RG{zone}'),
         (lowest_points,                 f'4_results_low_RG{zone}'),
-        (centers,                       f'5_results_centers_RG{zone}'),
-        (profile_90,                    f'6_results_90_RG{zone}')
+        (centers,                       f'5_results_centers_RG{zone}')
     ]
     # Création et export des GeoDataFrames
     for data, filename in shapefile_data:
         gdf = gpd.GeoDataFrame(data, crs=craters.crs)
         shapefile_path = f'results/RG{zone}/{filename}.shp'
         gdf.to_file(shapefile_path)
+
 
