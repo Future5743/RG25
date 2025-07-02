@@ -250,7 +250,7 @@ for zone in zones:
 
                     print("✅ Circularity calculation done")
 
-                    if 0.98 <= circularity <= 1:
+                    if 0.95 <= circularity <= 1:
 
                         ### --- SLOPES --- ###
 
@@ -276,7 +276,7 @@ for zone in zones:
                             prof_moyen_crat = round(np.mean(depth), 3)
 
                             sigma = np.sqrt(precision_error ** 2 + np.std(depth) ** 2)
-                            delta_d_hoover = sigma / np.sqrt(N + 1)                         # Hoover et al., 2024
+                            delta_d_hoover = sigma / np.sqrt(N)                         # Hoover et al., 2024
 
                             ### --- d//D CALCULATION --- ###
 
