@@ -123,7 +123,7 @@ def slopes_px2px(slopes_list, slopes_uncertainties, index_min_inner, index_max_i
 
     if slopes_list:
         mean_slope_px = round(np.nanmean(slopes_list), 2)
-        mean_uncertainty = round(np.sqrt(np.nansum(np.array(slopes_uncertainties) ** 2)) / len(slopes_uncertainties), 2)
+        mean_uncertainty = round(np.sqrt(np.nansum(np.array(slopes_uncertainties) ** 2)) / np.sqrt(len(slopes_uncertainties)), 2)
     else:
         mean_slope_px = np.nan
         mean_uncertainty = np.nan
