@@ -8,8 +8,10 @@ import shutil
 import rasterio
 from rasterio.mask import mask
 import numpy as np
-from shapely.geometry import Point, Polygon, LineString
+from shapely.geometry import Point, Polygon
 from tqdm import tqdm
+from datetime import datetime
+from Wanted_morph import ask_wanted_morph
 from Maximum_search import find_maxima
 from Circularity import Miller_index
 from Slopes import max_crater_slopes_calculation, slopes_stopar_calculation
@@ -22,7 +24,7 @@ from PDF_report import create_crater_report
 ##################################################### DATA OPENING #####################################################
 ########################################################################################################################
 
-zones = [7]
+zones = [2, 3, 4, 5, 6, 7, 8]
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 zone_settings = {
@@ -34,6 +36,8 @@ zone_settings = {
     7: {'pixel_size_tb': 5, 'precision_error': 2.37},
     8: {'pixel_size_tb': 5, 'precision_error': 1.89}
 }
+
+wanted_morph = ask_wanted_morph()
 
 for zone in zones:
 
@@ -250,7 +254,7 @@ for zone in zones:
 
                     print("✅ Circularity calculation done")
 
-                    if 0.95 <= circularity <= 1:
+                    if 0.90 <= circularity <= 1:
 
                         ### --- SLOPES --- ###
 
@@ -260,15 +264,6 @@ for zone in zones:
 
                             print(f"✅ The maximum slope between to opposite point on the rim is {max_slope_crater}")
 
-                            ### --- CREATION OF A CIRCLE ADJUSTED TO CRATER DIMENSIONS --- ###
-
-                            def buffer_diam_max(center_x, center_y, radius, num_points=40):
-                                center = Point(center_x, center_y)
-                                buffer_poly = center.buffer(radius, resolution=num_points)
-                                return buffer_poly
-
-                            buf_diam_max = buffer_diam_max(x_bary, y_bary, ray_largest_diam)
-
                             ### --- AVERAGE CRATER DEPTH --- ###
 
                             depth = [x - min_val for x in max_value]
@@ -276,192 +271,213 @@ for zone in zones:
                             prof_moyen_crat = round(np.mean(depth), 3)
 
                             sigma = np.sqrt(precision_error ** 2 + np.std(depth) ** 2)
-                            delta_d_hoover = sigma / np.sqrt(N)                         # Hoover et al., 2024
-
-                            ### --- d//D CALCULATION --- ###
-
-                            ratio_dD = round(prof_moyen_crat / moy_diam, 3)
-
-                            # d/D UNCERTAINTIES CALCULATION
-
-                            ## Hoover et al., 2024
-                            rel_err_prof_hoover = delta_d_hoover / prof_moyen_crat
-                            rel_err_diam_hoover = delta_D_hoover / moy_diam
-                            rel_err_ratio_hoover = np.sqrt(rel_err_prof_hoover ** 2 + rel_err_diam_hoover ** 2)
-                            delta_dD_hoover = round(rel_err_ratio_hoover * ratio_dD, 3)
-
-                            print("✅ d/D done")
-
-        ### Add geometry from highest_points
-                            rim_approx_geom = Polygon(max_coord_real)
+                            delta_d_hoover = sigma / np.sqrt(N)  # Hoover et al., 2024
                             
                             ### --- CREATING TOPOGRAPHIC PROFILES --- ###
 
                             crater_floor, point_inner, idx_inner, crater_morph = main(demi_profiles_value,
-                                                                        demi_profiles_coords_relatives,
-                                                                        pixel_size_tb, swirl_on_or_off, zone, crater_id,
-                                                                        no_data_value, depth, min_val)
+                                                                                      demi_profiles_coords_relatives,
+                                                                                      pixel_size_tb,
+                                                                                      swirl_on_or_off,
+                                                                                      zone,
+                                                                                      crater_id,
+                                                                                      no_data_value,
+                                                                                      depth,
+                                                                                      min_val,
+                                                                                      wanted_morph)
 
-                            ### --- SLOPES CALCULATION --- ###
+                            if crater_morph != "Other":
 
-                            visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
+                                ### --- CREATION OF A CIRCLE ADJUSTED TO CRATER DIMENSIONS --- ###
 
-                            (
-                                slopes_stopar,
-                                slopes_stopar_geom,
-                                mean_slope_stopar,
-                                delta_stopar,
-                                rim_height,
-                                reliability_rim_height
-                            ) = slopes_stopar_calculation(
-                                demi_profiles_value,
-                                demi_profiles_coords_relatives,
-                                max_coord_real,
-                                max_value,
-                                point_inner,
-                                idx_inner,
-                                crater_floor,
-                                pixel_size_tb,
-                                precision_error,
-                                out_transform,
-                                no_data_value,
-                                zone
-                            )
-
-                            print("✅ Slopes calculation done")
-
-                            ### --- TRI ALGORITHM --- ###
-                            TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb, crater_id, zone,
-                                craters.crs)
-
-                            print("✅ TRI done")
-
-                            ### --- AUTOMATIC CLASSIFICATION --- ###
-
-                            state = "Unknown"
-                            slope_max = np.max(slopes_stopar)
-
-                            if ratio_dD > 1 / 5 and slope_max > 35:
-                                state = "A"
-                            elif 1 / 7 < ratio_dD <= 1 / 5 and 25 < slope_max <= 35:
-                                state = "AB"
-                            elif 1 / 10 < ratio_dD <= 1 / 7 and 15 < slope_max <= 25:
-                                state = "B"
-                            elif 1/12 < ratio_dD < 1 / 10 and 10 < slope_max <= 15:
-                                state = "BC"
-                            elif ratio_dD < 1 / 12 and slope_max < 10:
-                                state = "C"
-                            elif ratio_dD > 1/7 and slope_max > 25:
-                                state = "A - AB"
-                            elif 1/10 < ratio_dD <= 1/5 and 15 < slope_max <= 35:
-                                state = "AB - B"
-                            elif 1/12 < ratio_dD < 1/7 and 10 < slope_max < 25:
-                                state = "B - BC"
-                            elif ratio_dD < 1 / 10 and slope_max < 15:
-                                state = "BC - C"
-
-                            print(f"〽️Degradation : {state}")
-
-                            ### --- RAPORT --- ###
-                            create_crater_report(crater_id,
-                                                 zone,
-                                                 swirl_on_or_off,
-                                                 crater_morph,
-                                                 state,
-                                                 x_bary,
-                                                 y_bary,
-                                                 lowest_point_coord,
-                                                 moy_diam,
-                                                 round(delta_D_hoover, 0),
-                                                 prof_moyen_crat,
-                                                 round(delta_d_hoover, 1),
-                                                 ratio_dD,
-                                                 delta_dD_hoover,
-                                                 circularity,
-                                                 mean_slope_stopar,
-                                                 slopes_stopar,
-                                                 delta_stopar
-                                                 )
+                                def buffer_diam_max(center_x, center_y, radius, num_points=40):
+                                    center = Point(center_x, center_y)
+                                    buffer_poly = center.buffer(radius, resolution=num_points)
+                                    return buffer_poly
 
 
-                            # Commune attributes
-                            common_attrs = {
-                                'run_id': crater_id,
-                                'NAC_DTM_ID': nac_id
-                            }
+                                buf_diam_max = buffer_diam_max(x_bary, y_bary, ray_largest_diam)
 
-                            # Line (profiles)
-                            angle = 0
-                            for i, geom in enumerate(max_geom):
+                                ### --- d/D CALCULATION --- ###
 
-                                highest_points.append({
-                                    'geometry': max_geom[i],
+                                ratio_dD = round(prof_moyen_crat / moy_diam, 3)
+
+                                # d/D UNCERTAINTIES CALCULATION
+
+                                ## Hoover et al., 2024
+                                rel_err_prof_hoover = delta_d_hoover / prof_moyen_crat
+                                rel_err_diam_hoover = delta_D_hoover / moy_diam
+                                rel_err_ratio_hoover = np.sqrt(rel_err_prof_hoover ** 2 + rel_err_diam_hoover ** 2)
+                                delta_dD_hoover = round(rel_err_ratio_hoover * ratio_dD, 3)
+
+                                print("✅ d/D done")
+
+                                ### Add geometry from highest_points
+                                rim_approx_geom = Polygon(max_coord_real)
+
+                                ### --- TRI ALGORITHM --- ###
+                                TRI_mean_crest = TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb,
+                                                     crater_id, zone, craters.crs, max_coord_real)
+
+                                print("✅ TRI done")
+
+                                (
+                                    slopes_stopar,
+                                    slopes_stopar_geom,
+                                    mean_slope_stopar,
+                                    delta_stopar,
+                                    rim_height,
+                                    reliability_rim_height
+                                ) = slopes_stopar_calculation(
+                                    demi_profiles_value,
+                                    demi_profiles_coords_relatives,
+                                    max_coord_real,
+                                    max_value,
+                                    point_inner,
+                                    idx_inner,
+                                    crater_floor,
+                                    pixel_size_tb,
+                                    precision_error,
+                                    out_transform,
+                                    no_data_value,
+                                    zone
+                                )
+
+                                print("✅ Slopes calculation done")
+
+                                ### --- SLOPES CALCULATION --- ###
+
+                                visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
+
+                                ### --- AUTOMATIC CLASSIFICATION --- ###
+
+                                state = "Unknown"
+                                slope_max = np.max(slopes_stopar)
+
+                                if ratio_dD > 1 / 5 and slope_max > 35:
+                                    state = "A"
+                                elif 1 / 7 < ratio_dD <= 1 / 5 and 25 < slope_max <= 35:
+                                    state = "AB"
+                                elif 1 / 10 < ratio_dD <= 1 / 7 and 15 < slope_max <= 25:
+                                    state = "B"
+                                elif 1/12 < ratio_dD < 1 / 10 and 10 < slope_max <= 15:
+                                    state = "BC"
+                                elif ratio_dD < 1 / 12 and slope_max < 10:
+                                    state = "C"
+                                elif ratio_dD > 1/7 and slope_max > 25:
+                                    state = "A - AB"
+                                elif 1/10 < ratio_dD <= 1/5 and 15 < slope_max <= 35:
+                                    state = "AB - B"
+                                elif 1/12 < ratio_dD < 1/7 and 10 < slope_max < 25:
+                                    state = "B - BC"
+                                elif ratio_dD < 1 / 10 and slope_max < 15:
+                                    state = "BC - C"
+
+                                print(f"〽️Degradation : {state}")
+
+                                ### --- REPORT --- ###
+                                create_crater_report(crater_id,
+                                                     zone,
+                                                     swirl_on_or_off,
+                                                     crater_morph,
+                                                     state,
+                                                     x_bary,
+                                                     y_bary,
+                                                     lowest_point_coord,
+                                                     moy_diam,
+                                                     round(delta_D_hoover, 0),
+                                                     prof_moyen_crat,
+                                                     round(delta_d_hoover, 1),
+                                                     ratio_dD,
+                                                     delta_dD_hoover,
+                                                     circularity,
+                                                     mean_slope_stopar,
+                                                     slopes_stopar,
+                                                     delta_stopar
+                                                     )
+
+                                # Commune attributes
+                                common_attrs = {
+                                    'run_id': crater_id,
+                                    'NAC_DTM_ID': nac_id
+                                }
+
+                                # Line (profiles)
+                                angle = 0
+                                for i, geom in enumerate(max_geom):
+
+                                    highest_points.append({
+                                        'geometry': max_geom[i],
+                                        **common_attrs,
+                                        'long': max_coord_real[i][0],
+                                        'lat': max_coord_real[i][1],
+                                        'max_alt': round(max_value[i], 1),
+                                        'position': f'Point à {angle}°'
+                                    })
+
+                                    results_slopes.append({
+                                        'geometry': slopes_stopar_geom[i],
+                                        **common_attrs,
+                                        'position': f'Ligne à {angle}°',
+                                        'slopeStopar': slopes_stopar[i],
+                                        'δStopar': delta_stopar[i],
+                                        'meanStopar': mean_slope_stopar,
+                                        "rim_height": rim_height[i],
+                                        "reliability": reliability_rim_height[i],
+                                        "mean_rim_h": np.mean(rim_height),
+                                        "mean_reliab": np.mean(reliability_rim_height)
+                                    })
+
+                                    angle += 10
+
+                                # Crater's center
+                                centers.append({
+                                    'geometry': geom_bary,
                                     **common_attrs,
-                                    'long': max_coord_real[i][0],
-                                    'lat': max_coord_real[i][1],
-                                    'max_alt': round(max_value[i], 1),
-                                    'position': f'Point à {angle}°'
+                                    'center_lon': x_bary,
+                                    'center_lat': y_bary
                                 })
 
-                                results_slopes.append({
-                                    'geometry': slopes_stopar_geom[i],
+                                # Lowest point
+                                lowest_points.append({
+                                    'geometry': min_geom,
                                     **common_attrs,
-                                    'position': f'Ligne à {angle}°',
-                                    'slopeStopar': slopes_stopar[i],
-                                    'δStopar': delta_stopar[i],
-                                    'meanStopar': mean_slope_stopar,
-                                    "rim_height": rim_height[i],
-                                    "reliability": reliability_rim_height[i],
+                                    'alt': round(min_val, 1),
+                                    'position': lowest_point_coord
+                                })
+
+                                # Approximative rim
+                                rim_approx.append({
+                                    'geometry': rim_approx_geom,
+                                    **common_attrs
+                                })
+
+                                # Crater's metadata
+                                result_geom_select_crat.append({
+                                    'geometry': buf_diam_max,
+                                    **common_attrs,
+                                    "morphology": crater_morph,
+                                    "deterior": state,
+                                    'center_lon': center_x,
+                                    'center_lat': center_y,
+                                    'ray_maxdia': ray_largest_diam,
+                                    'mean_diam': int(moy_diam),
+                                    'δ_D': round(delta_D_hoover, 0),
+                                    'mean_depth': round(prof_moyen_crat, 1),
+                                    'δ_d': round(delta_d_hoover, 1),
+                                    'ratio_dD': ratio_dD,
+                                    'δ_dD': delta_dD_hoover,
+                                    'circu': circularity,
+                                    'mean_slope': mean_slope_stopar,
+                                    'mean TRI': TRI_mean_crest,
                                     "mean_rim_h": np.mean(rim_height),
-                                    "mean_reliab": np.mean(reliability_rim_height)
+                                    "mean_reliab": np.mean(reliability_rim_height),
+                                    'swirl': swirl_on_or_off,
+                                    'hiesinger': floor_age
                                 })
 
-                                angle += 10
-
-                            # Crater's center
-                            centers.append({
-                                'geometry': geom_bary,
-                                **common_attrs,
-                                'center_lon': x_bary,
-                                'center_lat': y_bary
-                            })
-
-                            # Lowest point
-                            lowest_points.append({
-                                'geometry': min_geom,
-                                **common_attrs,
-                                'alt': round(min_val, 1),
-                                'position': lowest_point_coord
-                            })
-
-                            # Approximative rim
-                            rim_approx.append({
-                                'geometry': rim_approx_geom,
-                                **common_attrs
-                            })
-
-                            # Crater's metadata
-                            result_geom_select_crat.append({
-                                'geometry': buf_diam_max,
-                                **common_attrs,
-                                "morphology": crater_morph,
-                                "deterior": state,
-                                'center_lon': center_x,
-                                'center_lat': center_y,
-                                'ray_maxdia': ray_largest_diam,
-                                'moyen_diam': int(moy_diam),
-                                'δ_D_hoov': round(delta_D_hoover, 0),
-                                'prof_moyen': round(prof_moyen_crat, 1),
-                                'δ_d_hoov': round(delta_d_hoover, 1),
-                                'ratio_dD': ratio_dD,
-                                'δ_dD_hoov': delta_dD_hoover,
-                                'circu': circularity,
-                                'mean_slope': mean_slope_stopar,
-                                "mean_rim_h": np.mean(rim_height),
-                                "mean_reliab": np.mean(reliability_rim_height),
-                                'swirl': swirl_on_or_off,
-                                'hiesinger': floor_age
-                            })
+                            else:
+                                print("❌ Does not have a wanted morphology")
 
                         else:
                             print("❌ Does not meet the 8° condition")
@@ -481,14 +497,16 @@ for zone in zones:
 ##################################################### RESULTS DATA #####################################################
 ########################################################################################################################
 
+    date = datetime.today().strftime("%Y%m%d")
+
     # List of the wanted shapefiles
     shapefile_data = [
-        (result_geom_select_crat,       f'0_results_global_RG{zone}'),
-        (rim_approx,                    f'1_results_rim_RG{zone}'),
-        (results_slopes,                f'2_results_slopes_RG{zone}'),
-        (highest_points,                f'3_results_max_RG{zone}'),
-        (lowest_points,                 f'4_results_low_RG{zone}'),
-        (centers,                       f'5_results_centers_RG{zone}')
+        (result_geom_select_crat,       f'{date}_RGdD_AL_global-results_v1'),
+        (rim_approx,                    f'{date}_RGdD_AL_rim_v1'),
+        (results_slopes,                f'{date}_RGdD_AL_slopes_v1'),
+        (highest_points,                f'{date}_RGdD_AL_highest-points_v1'),
+        (lowest_points,                 f'{date}_RGdD_AL_lowest_points_v1'),
+        (centers,                       f'{date}_RGdD_AL_centers_v1')
     ]
     # Création et export des GeoDataFrames
     for data, filename in shapefile_data:

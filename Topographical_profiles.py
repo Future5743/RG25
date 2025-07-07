@@ -10,7 +10,8 @@ import numpy as np
 from scipy.interpolate import CubicSpline
 from scipy.signal import savgol_filter
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, PhotoImage
+from PIL import Image, ImageTk
 
 ########################################################################################################################
 ######################################################### CODE #########################################################
@@ -811,7 +812,7 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
     button3.on_clicked(set_morph_to_Mound)
     button4.on_clicked(set_morph_to_Unknown)
 
-    ax.set_title(f'Select two points for Crater {crater_id}')
+    ax.set_title(f'All profiles of crater {crater_id}')
     ax.set_xlabel("Distance in points relative to the lowest point")
     ax.set_ylabel("Elevation")
     ax.grid(True)
@@ -833,8 +834,24 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
 
         def ask_crater_morph_change(crater_morph):
             def on_yes():
-                for btn in morphology_buttons.values():
-                    btn.pack(pady=5)
+                # Supprimer les anciens boutons s’ils existent
+                for widget in morph_frame.winfo_children():
+                    widget.destroy()
+
+                # Afficher les boutons de morphologie dynamiquement
+                if crater_morph == "Unknown":
+                    options = ["Bowl-shaped", "Flat-floored", "With a mound"]
+                elif crater_morph == "Flat-floored":
+                    options = ["Bowl-shaped", "With a mound", "Unknown"]
+                elif crater_morph == "With a mound":
+                    options = ["Bowl-shaped", "Flat-floored", "Unknown"]
+                else:
+                    options = []
+
+                for option in options:
+                    btn = tk.Button(morph_frame, text=option, width=20, command=lambda opt=option: on_choice(opt))
+                    btn.pack(side="left", padx=10)
+                    morphology_buttons[option] = btn
 
             def on_no():
                 root.destroy()
@@ -846,40 +863,64 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
                     crater_floor = [0] * 36
                 root.destroy()
 
-            # Initialisation de la fenêtre
+            # === Configuration de la fenêtre ===
             root = tk.Tk()
-            root.title("User Choice")
+            root.title("Crater Morphology Selection")
+            window_width = 1500
+            window_height = 700
+            root.geometry(f"{window_width}x{window_height}")
 
-            # Label principal
+            # === Label de question ===
             label_question = tk.Label(
                 root,
                 text="Have you changed your mind about the crater morphology?",
                 font=("Helvetica", 12)
             )
-            label_question.pack(pady=15)
+            label_question.pack(pady=10)
 
-            # Boutons Oui / Non
-            btn_yes = tk.Button(root, text="Yes", width=20, command=on_yes)
-            btn_yes.pack(pady=5)
+            # === Affichage des images ===
+            image_dir = f"results/RG{zone}/profiles/{swirl_on_or_off}/{crater_id}"
+            image_frame = tk.Frame(root)
+            image_frame.pack(pady=10)
 
-            btn_no = tk.Button(root, text="No", width=20, command=on_no)
-            btn_no.pack(pady=5)
+            image_size = (225, 150)
+            images = []
+            image_refs = []
 
-            # Dictionnaire des boutons selon le contexte
+            image_files = sorted([
+                f for f in os.listdir(image_dir)
+                if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))
+            ])[:18]
+
+            for idx, filename in enumerate(image_files):
+                full_path = os.path.join(image_dir, filename)
+                try:
+                    img = Image.open(full_path).resize(image_size, Image.Resampling.LANCZOS)
+                    img_tk = ImageTk.PhotoImage(img)
+                except Exception as e:
+                    print(f"Erreur de chargement image {filename}: {e}")
+                    continue
+
+                lbl = tk.Label(image_frame, image=img_tk)
+                lbl.grid(row=idx // 6, column=idx % 6, padx=5, pady=5)
+                images.append(lbl)
+                image_refs.append(img_tk)
+
+            # === Boutons Yes / No ===
+            yes_no_frame = tk.Frame(root)
+            yes_no_frame.pack(pady=10)
+
+            btn_yes = tk.Button(yes_no_frame, text="Yes", width=20, command=on_yes)
+            btn_yes.pack(side="left", padx=10)
+
+            btn_no = tk.Button(yes_no_frame, text="No", width=20, command=on_no)
+            btn_no.pack(side="left", padx=10)
+
+            # === Frame pour les boutons de morphologie (vide au départ) ===
+            morph_frame = tk.Frame(root)
+            morph_frame.pack(pady=10)
+
             morphology_buttons = {}
-
-            if crater_morph == "Unknown":
-                options = ["Bowl-shaped", "Flat-floored", "With a mound"]
-            elif crater_morph == "Flat-floored":
-                options = ["Bowl-shaped", "With a mound", "Unknown"]
-            elif crater_morph == "With a mound":
-                options = ["Bowl-shaped", "Flat-floored", "Unknown"]
-            else:
-                options = []
-
-            for option in options:
-                btn = tk.Button(root, text=option, width=20, command=lambda opt=option: on_choice(opt))
-                morphology_buttons[option] = btn
 
             root.mainloop()
             return crater_morph
@@ -889,8 +930,135 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
     return crater_floor, crater_morph
 
 
+def display_images(zone, swirl_on_or_off, crater_id):
+    image_dir = f"results/RG{zone}/profiles/{swirl_on_or_off}/{crater_id}"
+    image_size = (225, 150)
+
+    try:
+        image_files = sorted([
+            f for f in os.listdir(image_dir)
+            if f.lower().endswith((".png", ".jpg", ".jpeg", ".gif"))
+        ])[:18]
+    except Exception as e:
+        print(f"Image folder access error : {e}")
+        return
+
+    root = tk.Tk()
+    root.title(f"All profiles of the crater {crater_id}")
+
+    image_frame = tk.Frame(root)
+    image_frame.pack(pady=10)
+
+    images = []
+    image_refs = []  # Pour éviter le garbage collection
+
+    for idx, filename in enumerate(image_files):
+        full_path = os.path.join(image_dir, filename)
+        try:
+            img = Image.open(full_path).resize(image_size, Image.Resampling.LANCZOS)
+            img_tk = ImageTk.PhotoImage(img)
+        except Exception as e:
+            print(f"Image loading error {filename}: {e}")
+            continue
+
+        lbl = tk.Label(image_frame, image=img_tk)
+        lbl.grid(row=idx // 6, column=idx % 6, padx=5, pady=5)
+        images.append(lbl)
+        image_refs.append(img_tk)
+
+    root.mainloop()
+
+
+def process_profiles_and_plot_bowl_shaped(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, zone,
+                                          crater_id, swirl_on_or_off):
+    min_X = [0] * 1000
+    crater_floor = [0] * 36
+    fig, ax = plt.subplots(figsize=(15, 7))
+    plt.subplots_adjust(bottom=0.3)
+
+    crater_morph = None
+
+    colors = ['black', 'silver', 'red', 'saddlebrown', 'orange', 'bisque', 'gold', 'darkgoldenrod', 'yellow',
+              'greenyellow', 'green', 'lime', 'turquoise', 'blue', 'skyblue', 'purple', 'plum', 'pink']
+
+    for i in range(int(len(demi_profiles_value) / 2)):
+
+        full_profile, X, min_X = process_profile(
+            demi_profiles_value, demi_profiles_coords_relatives, i, pixel_size_tb, min_X)
+
+        # Plot and save each individual profile
+        plt.figure(figsize=(15, 7))
+        plt.plot(X, full_profile, color='b', label='Profile')
+        plt.xlabel("Distance (m)")
+        plt.ylabel("Elevation")
+        plt.title(f'Topographic Profile for Angles {i * 10}° to {(i + 18) * 10}° of Crater {crater_id}')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig(build_save_path(zone, swirl_on_or_off, crater_id, i=i, suffix=""))
+        plt.close()
+
+        # Find index of minimum elevation point (crater floor)
+        limit_profile = np.where(full_profile == np.nanmin(full_profile))[0]
+
+        if len(limit_profile) > 1:
+            limit_profile = limit_profile[0]
+
+        limit_profile = int(limit_profile)
+
+        X_test = [index - limit_profile for index in range(len(X))]
+
+        # Functions to set crater morphology based on user button clicks
+        def set_morph_to_Bowl(event):
+            nonlocal crater_morph
+            crater_morph = "Bowl-shaped"
+            plt.close()
+
+        def set_morph_to_other(event):
+            nonlocal crater_morph
+            crater_morph = "Other"
+            plt.close()
+
+        # Plot profiles centered on their minimum elevation point
+        ax.plot(X_test, full_profile, color=colors[i], marker='', label='Topographic Profile', linewidth=0.5)
+
+    # Centrage des deux boutons en bas
+    button_width = 0.15
+    button_height = 0.075
+    spacing = 0.05
+    total_width = 2 * button_width + spacing
+    start_x = (1 - total_width) / 2
+
+    button_axes = [
+        plt.axes([start_x + i * (button_width + spacing), 0.1, button_width, button_height])
+        for i in range(2)
+    ]
+
+    button1 = Button(button_axes[0], 'Bowl-shaped')
+    button2 = Button(button_axes[1], 'Other')
+
+    button1.on_clicked(set_morph_to_Bowl)
+    button2.on_clicked(set_morph_to_other)
+
+    # Bouton en haut à droite
+    top_right_ax = plt.axes([0.8, 0.9, 0.15, 0.075])
+    top_right_button = Button(top_right_ax, 'See all the profiles')
+
+    def on_top_right_click(event):
+        display_images(zone, swirl_on_or_off, crater_id)
+
+    top_right_button.on_clicked(on_top_right_click)
+
+    ax.set_title(f'All profiles of crater {crater_id}')
+    ax.set_xlabel("Distance in points relative to the lowest point")
+    ax.set_ylabel("Elevation")
+    ax.grid(True)
+    plt.show()
+
+    return crater_floor, crater_morph
+
+
 def main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swirl_on_or_off, zone, crater_id,
-         no_data_value, depth, min_val):
+         no_data_value, depth, min_val, wanted_morph):
     '''
     This function plots and saves profiles, estimates the crater floor for each profile,
     and computes two inner points near 20% and 80% of the total depth per profile.
@@ -943,10 +1111,17 @@ def main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swi
         demi_profiles_coords_relatives, demi_profiles_value, no_data_value, depth, min_val
     )
 
-    crater_floor, crater_morph = process_profiles_and_plot(
-        demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, points_inner_20,
-        zone, crater_id, swirl_on_or_off
-    )
+    if wanted_morph == "Bowl-shaped":
+        crater_floor, crater_morph = process_profiles_and_plot_bowl_shaped(demi_profiles_value,
+                                                                           demi_profiles_coords_relatives,
+                                                                           pixel_size_tb, zone,
+                                                                           crater_id, swirl_on_or_off)
+
+    else:
+        crater_floor, crater_morph = process_profiles_and_plot(
+            demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, points_inner_20,
+            zone, crater_id, swirl_on_or_off
+        )
 
     return crater_floor, points_inner_20, index_inner_20, crater_morph
 

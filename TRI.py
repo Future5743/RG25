@@ -6,11 +6,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import rasterio
 from rasterio.mask import mask
-from rasterio.transform import from_origin
+from rasterio.transform import from_origin, rowcol
 from shapely.geometry import Polygon
 from scipy.ndimage import generic_filter
 import geopandas as gpd
 from PIL import Image
+import time
 
 ########################################################################################################################
 ######################################################### CODE #########################################################
@@ -112,7 +113,30 @@ def compute_TRI_array(image, no_data_value):
     return generic_filter(image[0], tri_func, size=3, mode='constant', cval=np.nan)
 
 
-def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, crs):
+def extract_values_from_geotiff(geotiff_path, coords):
+    """
+    chemin_geotiff : chemin vers le fichier GeoTIFF
+    coordonnees : liste de tuples (x, y) dans le même système de référence que le GeoTIFF
+    """
+    TRI_max = []
+
+    with rasterio.open(geotiff_path) as src:
+
+        for coord in coords:
+
+            row, col = rowcol(src.transform, coord[0], coord[1])
+
+            try:
+                value = src.read(1)[row, col]
+            except IndexError:
+                value = None
+
+            TRI_max.append(value)
+
+    return round(np.mean(TRI_max), 2)
+
+
+def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, crs, max_coord_real):
     '''
     Main function to compute the TRI index over a crater area.
 
@@ -141,6 +165,7 @@ def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zo
     --------
     None
     '''
+
     # Define a square polygon centered on the crater
     half_size = ray
     coords = [
@@ -246,3 +271,59 @@ def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zo
     # Save results
     draw_TRI(TRI_array, id, zone)
     array_to_GeoTIF(TRI_array, coords[0], pixel_size_tb, id, zone, crs)
+
+    TRI_mean_crest = extract_values_from_geotiff(f'results/RG{zone}/TRI/TRI_{id}.tif', max_coord_real)
+
+    return TRI_mean_crest
+
+"""
+zones = [2, 3, 4, 5, 6, 7, 8]
+
+# Definition of the pixel size and of the vertical precision error for each zone (DTM)
+zone_settings = {
+    2: {'pixel_sizeb_t': 2, 'precision_error': 0.81},
+    3: {'pixel_size_tb': 2, 'precision_error': 0.91},
+    4: {'pixel_size_tb': 2, 'precision_error': 0.87},
+    5: {'pixel_size_tb': 5, 'precision_error': 2.54},
+    6: {'pixel_size_tb': 5, 'precision_error': 2.34},
+    7: {'pixel_size_tb': 5, 'precision_error': 2.37},
+    8: {'pixel_size_tb': 5, 'precision_error': 1.89}
+}
+
+for zone in zones:
+
+    debut = time.time()
+
+    # Charger le MNT
+    mnt_path = os.path.join('..', 'data', 'RG', 'DTM', f'NAC_DTM_REINER{zone}.tiff')
+
+    params = zone_settings.get(zone)
+    pixel_size = params['pixel_size_tb']
+
+    with rasterio.open(mnt_path) as src:
+        mnt = src.read(1, masked=False)
+        profile = src.profile
+        transform = src.transform
+        crs = src.crs
+        no_data_value = src.nodata
+
+    # Calcul du TRI sur tout le MNT
+    TRI_array = compute_TRI_array(np.expand_dims(mnt, axis=0), no_data_value)
+
+    # Nettoyage des NaNs
+    TRI_array = np.nan_to_num(TRI_array, nan=0.0)
+
+    # Sauvegarde (ajuste selon ton organisation)
+    id = f'MNT{zone}'      # identifiant général, pas de cratère ici
+    zone = 'FULL'   # ou nom du site, par exemple
+
+    # Sauvegarder l’image en .png
+    draw_TRI(TRI_array, id, zone)
+
+    # Enregistrer en GeoTIFF
+    coord_left_down = [transform.c, transform.f - mnt.shape[0] * pixel_size]
+    array_to_GeoTIF(TRI_array, coord_left_down, pixel_size, id, zone, crs)
+
+    fin = time.time()
+    print(f"Temps d'exécution : {fin - debut:.6f} secondes")
+"""

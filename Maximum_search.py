@@ -136,13 +136,10 @@ def find_maxima(min_position, min_value, masked_image, out_transform):
             max_val = np.nanmax(profile_values)
 
             # Avoid using edge values as max (possible artifacts)
-
-            """
             while max_val in profile_values[-3:]:
                 max_indices_invalid = np.where(profile_values == max_val)
                 profile_values[max_indices_invalid] = -np.inf
                 max_val = np.max(profile_values)
-            """
 
             if max_val != min_value:
 
