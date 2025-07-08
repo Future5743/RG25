@@ -1,1 +1,0 @@
-PROJCS["Equirectangular_Moon",GEOGCS["GCS_Moon",DATUM["D_Moon",SPHEROID["Moon_localRadius",1737400.0,0.0]],PRIMEM["Reference_Meridian",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Equidistant_Cylindrical"],PARAMETER["false_easting",0.0],PARAMETER["false_northing",0.0],PARAMETER["central_meridian",180.0],PARAMETER["standard_parallel_1",7.0],UNIT["Meter",1.0]]
