@@ -228,6 +228,9 @@ def data_recovery(global_results_shp, rim_shp, centers_shp, lowest_shp, highest_
     matched_row_highest = highest_shp[highest_shp['run_id'] == crater_id]
     matched_row_slopes = slopes_shp[slopes_shp['run_id'] == crater_id]
 
+    print(crater_id)
+    print(matched_row_rim)
+
     row_global = matched_row_global.iloc[0]
     row_rim = matched_row_rim.iloc[0]
     row_centers = matched_row_centers.iloc[0]
