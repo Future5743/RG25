@@ -24,8 +24,10 @@ def draw_TRI(TRI, id, zone):
     -----------
     TRI: array
         Contains the TRI values for the studied crater
+
     id: int
         ID of the studied crater
+
     zone: str
         Indicates the study zone of the crater (can be 1 to 7)
 
@@ -51,14 +53,19 @@ def array_to_GeoTIF(TRI, coord_left_down, pixel_size_tb, id, zone, crs):
     -----------
     TRI: array
         TRI values for the crater
+
     coord_left_down: list
         Coordinates of the bottom-left pixel of the TRI matrix
+
     pixel_size_tb: int
         Pixel size in meters
+
     id: int
         ID of the crater
+
     zone: str
         Study zone
+
     crs: str
         Coordinate Reference System (CRS) of the study area
 
@@ -91,6 +98,7 @@ def compute_TRI_array(image, no_data_value):
     -----------
     image: array
         Raster image array (1-band)
+
     no_data_value: float or int
         Value used to represent no-data in the raster
 
@@ -133,7 +141,9 @@ def extract_values_from_geotiff(geotiff_path, coords):
 
             TRI_max.append(value)
 
-    return round(np.mean(TRI_max), 2)
+    TRI_max_cleaned = [x if x is not None else np.nan for x in TRI_max]
+
+    return round(np.nanmean(TRI_max_cleaned), 2)
 
 
 def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zone, crs, max_coord_real):
@@ -144,22 +154,33 @@ def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zo
     -----------
     center_x_dl: float
         X coordinate of the crater center
+
     center_y_dl: float
         Y coordinate of the crater center
+
     ray: float
         Radius of the area to extract (square side = 2*ray)
+
     src: rasterio dataset
         The input raster source
+
     no_data_value: int or float
         Value representing no-data in the source
+
     pixel_size_tb: int
         Pixel size in meters
+
     id: int
         Crater ID
+
     zone: str
         Crater study zone (1 to 7)
+
     crs: str
         Coordinate reference system of the crater
+
+    max_coord_real: list
+        Real coordinates of the points on the rim crest
 
     Returns:
     --------
@@ -276,6 +297,10 @@ def TRI(center_x_dl, center_y_dl, ray, src, no_data_value, pixel_size_tb, id, zo
 
     return TRI_mean_crest
 
+# These commented lines are used to compute the TRI on an entre DTM
+# The process take a lot of time (around 40minutes per DTM
+# If you want to run it, delete the 6 ", then run this python file
+# Be careful, please put back the 6 " if you want to run main.py
 """
 zones = [2, 3, 4, 5, 6, 7, 8]
 
@@ -294,7 +319,7 @@ for zone in zones:
 
     debut = time.time()
 
-    # Charger le MNT
+    # Load the DTM
     mnt_path = os.path.join('..', 'data', 'RG', 'DTM', f'NAC_DTM_REINER{zone}.tiff')
 
     params = zone_settings.get(zone)
@@ -307,23 +332,23 @@ for zone in zones:
         crs = src.crs
         no_data_value = src.nodata
 
-    # Calcul du TRI sur tout le MNT
+    # Computation of TRI on the entire DTM
     TRI_array = compute_TRI_array(np.expand_dims(mnt, axis=0), no_data_value)
 
-    # Nettoyage des NaNs
+    # NaNs cleaning
     TRI_array = np.nan_to_num(TRI_array, nan=0.0)
 
-    # Sauvegarde (ajuste selon ton organisation)
-    id = f'MNT{zone}'      # identifiant général, pas de cratère ici
+    # Save
+    id = f'MNT{zone}'      # general id, not the crater id
     zone = 'FULL'   # ou nom du site, par exemple
 
-    # Sauvegarder l’image en .png
+    # Save the picture in png
     draw_TRI(TRI_array, id, zone)
 
-    # Enregistrer en GeoTIFF
+    # Save in GeoTIFF
     coord_left_down = [transform.c, transform.f - mnt.shape[0] * pixel_size]
     array_to_GeoTIF(TRI_array, coord_left_down, pixel_size, id, zone, crs)
 
     fin = time.time()
-    print(f"Temps d'exécution : {fin - debut:.6f} secondes")
+    print(f"Execution time : {fin - debut:.6f} seconds")
 """

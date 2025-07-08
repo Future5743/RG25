@@ -5,6 +5,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 import os
+import shutil
 import math
 import numpy as np
 from scipy.interpolate import CubicSpline
@@ -350,8 +351,7 @@ def build_save_path(zone, swirl_on_or_off, crater_id, i, suffix):
     return os.path.join(base_path, filename)
 
 
-def save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
-                          alt_points_inner_20):
+def save_and_plot_profile(full_profile, X, i, crater_id, alt_points_inner_20):
     '''
     This function plots and saves a profile and its second derivative.
     It also computes an estimation of the crater floor.
@@ -380,14 +380,8 @@ def save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
     i: int
         The current loop iteration.
 
-    zone: str
-        Indicates the crater study zone (can be 1, 2, 3, 4, 5, 6, or 7).
-
     crater_id: int
         The ID of the studied crater.
-
-    swirl_on_or_off: str
-        Indicates whether the crater is in swirl mode or not.
 
     alt_points_inner_20: list
         Indicates the points at an elevation value corresponding to 20% of the total depth.
@@ -406,12 +400,6 @@ def save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
         limit_profile = limit_profile[0]
 
     limit_profile = int(limit_profile)
-
-    def build_save_path(zone, swirl_on_or_off, crater_id, i, suffix):
-        base_path = f'results/RG{zone}/profiles/{swirl_on_or_off}/{crater_id}'
-        os.makedirs(base_path, exist_ok=True)
-        filename = f"Profile_{i * 10}_{(i + 18) * 10}{suffix}.png"
-        return os.path.join(base_path, filename)
 
     indices_20 = find_alt_point_indices(full_profile, alt_points_inner_20)
 
@@ -700,7 +688,7 @@ def process_all_inner_points(demi_profiles_coords_relative, demi_profiles_values
 
 
 def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb,
-                              points_inner_20, zone, crater_id, swirl_on_or_off):
+                              points_inner_20, zone, crater_id, swirl_on_or_off, index_inner_20):
     '''
     This function generates profiles, saves their plots, and extracts the indices delimiting the crater floor
     in each given profile.
@@ -736,8 +724,11 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
         Morphology classification of the crater based on user selection (e.g., "Bowl-shaped", "Flat-floored").
     '''
 
+    crater_floor = []
+    for i in range (len(index_inner_20)):
+        crater_floor.append(index_inner_20[i][0])
+
     min_X = [0] * 1000
-    crater_floor = [0] * 36
     fig, ax = plt.subplots(figsize=(15, 7))
     plt.subplots_adjust(bottom=0.3)
 
@@ -826,19 +817,18 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
 
             alt_20 = [points_inner_20[i][0], points_inner_20[i + 18][0]]
 
-            idx1, idx2 = save_and_plot_profile(full_profile, X, i, zone, crater_id, swirl_on_or_off,
-                                               alt_20)
+            idx1, idx2 = save_and_plot_profile(full_profile, X, i, crater_id, alt_20)
 
             crater_floor[i] = idx1
             crater_floor[i + 18] = idx2
 
         def ask_crater_morph_change(crater_morph):
             def on_yes():
-                # Supprimer les anciens boutons s’ils existent
+                # Delete previous buttons
                 for widget in morph_frame.winfo_children():
                     widget.destroy()
 
-                # Afficher les boutons de morphologie dynamiquement
+                # Display morphology buttons
                 if crater_morph == "Unknown":
                     options = ["Bowl-shaped", "Flat-floored", "With a mound"]
                 elif crater_morph == "Flat-floored":
@@ -863,14 +853,14 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
                     crater_floor = [0] * 36
                 root.destroy()
 
-            # === Configuration de la fenêtre ===
+            # Window configuration
             root = tk.Tk()
             root.title("Crater Morphology Selection")
             window_width = 1500
             window_height = 700
             root.geometry(f"{window_width}x{window_height}")
 
-            # === Label de question ===
+            # Question label
             label_question = tk.Label(
                 root,
                 text="Have you changed your mind about the crater morphology?",
@@ -878,7 +868,7 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
             )
             label_question.pack(pady=10)
 
-            # === Affichage des images ===
+            # Pictures display
             image_dir = f"results/RG{zone}/profiles/{swirl_on_or_off}/{crater_id}"
             image_frame = tk.Frame(root)
             image_frame.pack(pady=10)
@@ -906,7 +896,7 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
                 images.append(lbl)
                 image_refs.append(img_tk)
 
-            # === Boutons Yes / No ===
+            # Yes/No buttons
             yes_no_frame = tk.Frame(root)
             yes_no_frame.pack(pady=10)
 
@@ -916,7 +906,7 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
             btn_no = tk.Button(yes_no_frame, text="No", width=20, command=on_no)
             btn_no.pack(side="left", padx=10)
 
-            # === Frame pour les boutons de morphologie (vide au départ) ===
+            # Frame for the morphologies buttons
             morph_frame = tk.Frame(root)
             morph_frame.pack(pady=10)
 
@@ -931,6 +921,25 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
 
 
 def display_images(zone, swirl_on_or_off, crater_id):
+
+    '''
+    This function plot the 18 profiles of a given crater.
+
+    Parameters:
+    -----------
+    zone: str
+        Indicates the study zone of the crater (values can be '1' to '7').
+
+    swirl_on_or_off: str
+        Indicates whether the crater is on or off a swirl feature.
+
+    crater_id: int
+        The ID of the crater being studied.
+
+    Returns:
+    --------
+    None
+    '''
     image_dir = f"results/RG{zone}/profiles/{swirl_on_or_off}/{crater_id}"
     image_size = (225, 150)
 
@@ -950,7 +959,7 @@ def display_images(zone, swirl_on_or_off, crater_id):
     image_frame.pack(pady=10)
 
     images = []
-    image_refs = []  # Pour éviter le garbage collection
+    image_refs = []
 
     for idx, filename in enumerate(image_files):
         full_path = os.path.join(image_dir, filename)
@@ -970,9 +979,46 @@ def display_images(zone, swirl_on_or_off, crater_id):
 
 
 def process_profiles_and_plot_bowl_shaped(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, zone,
-                                          crater_id, swirl_on_or_off):
+                                          crater_id, swirl_on_or_off, index_inner_20):
+
+    '''
+    This function generates profiles, saves their plots, and extracts the indices delimiting the crater floor
+    in each given profile.
+
+    Parameters:
+    -----------
+    demi_profiles_value: list
+        Contains elevation values for each point in each semi-profile.
+
+    demi_profiles_coords_relatives: list
+        Contains the relative coordinates of each point in each semi-profile.
+
+    pixel_size_tb: int
+        The size of each pixel on the terrain (spatial resolution).
+
+    zone: str
+        Indicates the study zone of the crater (values can be '1' to '7').
+
+    crater_id: int
+        The ID of the crater being studied.
+
+    swirl_on_or_off: str
+        Indicates whether the crater is on or off a swirl feature.
+
+    Returns:
+    --------
+    crater_floor: list
+        Contains all points selected to delimit the crater floor.
+
+    crater_morph: str
+        Morphology classification of the crater based on user selection (e.g., "Bowl-shaped" or Other").
+    '''
+
+    crater_floor = []
+    for i in range (len(index_inner_20)):
+        crater_floor.append(index_inner_20[i][0])
+
     min_X = [0] * 1000
-    crater_floor = [0] * 36
     fig, ax = plt.subplots(figsize=(15, 7))
     plt.subplots_adjust(bottom=0.3)
 
@@ -1021,7 +1067,6 @@ def process_profiles_and_plot_bowl_shaped(demi_profiles_value, demi_profiles_coo
         # Plot profiles centered on their minimum elevation point
         ax.plot(X_test, full_profile, color=colors[i], marker='', label='Topographic Profile', linewidth=0.5)
 
-    # Centrage des deux boutons en bas
     button_width = 0.15
     button_height = 0.075
     spacing = 0.05
@@ -1039,7 +1084,6 @@ def process_profiles_and_plot_bowl_shaped(demi_profiles_value, demi_profiles_coo
     button1.on_clicked(set_morph_to_Bowl)
     button2.on_clicked(set_morph_to_other)
 
-    # Bouton en haut à droite
     top_right_ax = plt.axes([0.8, 0.9, 0.15, 0.075])
     top_right_button = Button(top_right_ax, 'See all the profiles')
 
@@ -1092,6 +1136,9 @@ def main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swi
     min_val: float
         Elevation of the lowest point of the crater.
 
+    wanted_morph: str
+        The wanted morphology (can be bowl-shapes only or all kinf of morphologies)
+
     Returns:
     --------
     crater_floor: list
@@ -1107,6 +1154,7 @@ def main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swi
         Morphology classification of the crater.
     '''
 
+    # Inner points calculation
     points_inner_20, index_inner_20 = process_all_inner_points(
         demi_profiles_coords_relatives, demi_profiles_value, no_data_value, depth, min_val
     )
@@ -1115,61 +1163,17 @@ def main(demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, swi
         crater_floor, crater_morph = process_profiles_and_plot_bowl_shaped(demi_profiles_value,
                                                                            demi_profiles_coords_relatives,
                                                                            pixel_size_tb, zone,
-                                                                           crater_id, swirl_on_or_off)
+                                                                           crater_id, swirl_on_or_off,
+                                                                           index_inner_20)
+
+        if crater_morph == "Other":
+            path = f"results//RG{zone}/profiles/{swirl_on_or_off}/{crater_id}"
+            shutil.rmtree(path)
 
     else:
         crater_floor, crater_morph = process_profiles_and_plot(
             demi_profiles_value, demi_profiles_coords_relatives, pixel_size_tb, points_inner_20,
-            zone, crater_id, swirl_on_or_off
+            zone, crater_id, swirl_on_or_off, index_inner_20
         )
 
     return crater_floor, points_inner_20, index_inner_20, crater_morph
-
-
-def visualisation3d(masked_image, crater_id, zone, swirl_on_or_off):
-    '''
-    This function plots and saves a 3D model of the studied crater.
-
-    Parameters:
-    -----------
-    masked_image: array-like
-        The input masked image containing elevation data of the crater.
-        Expected shape: (1, rows, cols)
-
-    crater_id: int
-        ID of the crater being studied.
-
-    zone: str
-        Specifies the study zone of the crater (can be one of '1', '2', '3', '4', '5', '6', or '7').
-
-    swirl_on_or_off: str
-        Indicates whether the crater is located on a swirl feature or not (e.g., 'on' or 'off').
-
-    Returns:
-    --------
-    None
-    '''
-    masked_band = masked_image[0]  # masked_image shape is expected to be (1, rows, cols)
-
-    # Create grid coordinates X and Y based on the shape of the masked band
-    rows, cols = masked_band.shape
-    X, Y = np.meshgrid(np.arange(cols), np.arange(rows))
-
-    # 3D visualization
-    fig = plt.figure(figsize=(15, 7))
-    ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(X, Y, masked_band, cmap='terrain', linewidth=0, antialiased=False)
-
-    ax.set_title(f'3D Visualization of Crater {crater_id} in RG{zone}')
-
-    # Construct the path to save the figure
-    path = f'results/RG{zone}/profiles/{swirl_on_or_off}/{crater_id}'
-    save_path = os.path.join(path, f'3D_Representation_{crater_id}.png')
-
-    # Ensure the directory exists
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-    # Save the figure and close plot to free memory
-    plt.savefig(save_path)
-    # plt.show()  # Uncomment to display plot interactively
-    plt.close()

@@ -1,12 +1,12 @@
 ########################################################################################################################
 ##################################################### IMPORTATIONS #####################################################
 ########################################################################################################################
+import os
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
 from reportlab.lib.colors import black
 from PIL import Image
-import os
 
 ########################################################################################################################
 ######################################################### CODE #########################################################
@@ -180,7 +180,7 @@ def banner(c, page_width, page_height, bandeau_height):
 
 def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat, coord_low,
                           diam, incer_D_hoov, d, incer_d_hoov,
-                          dtoD, incer_dD_hoov, mill, mean_slope, slope, delta_slope):
+                          dtoD, incer_dD_hoov, mill, mean_slope, slope, delta_slope, TRI_mean_crest):
     """
     Generates a multi-page PDF report for a crater, including:
     - Header and logos
@@ -241,6 +241,9 @@ def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat,
     delta_slope: list
         Slope uncertainty per angle
 
+    TRI_mean_crest: float
+        Mean TRI on the rim crest
+
     Returns:
     --------
     None
@@ -256,10 +259,10 @@ def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat,
     marge_gauche = 2 * cm
     marge_droite = 2 * cm
 
-    # === Bandeau noir en haut ===
+    # === Black banner ===
     bandeau_height = 2 * cm
 
-    # === Logos gauche et droite ===
+    # === Logos ===
     banner(c, page_width, page_height, bandeau_height)
 
     ESPACEMENT_SOUS_TITRE = 1 * cm
@@ -303,8 +306,7 @@ def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat,
         ("d/D ratio", f"{dtoD} ± {incer_dD_hoov}"),
         ("Circularity index", f"{mill}"),
         ("Mean slope", f"{mean_slope}°"),
-        ("Geometric center coordinates", f"({center_long}, {center_lat})"),
-        ("Coordinates of the crater's lowest point", f"{coord_low}")
+        ("Mean value of TRI on the rim crest", f"{'%.2f' % round(TRI_mean_crest, 2)}")
     ]
 
     for label, value in infos:
@@ -330,7 +332,37 @@ def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat,
 
         y_text -= 4
 
-    # Nez part: general information on slopes ===
+    x_text = marge_gauche
+
+    infos2 = [
+        ("Geometric center coordinates", f"({center_long}, {center_lat})"),
+        ("Coordinates of the crater's lowest point", f"{coord_low}")
+    ]
+
+    for label, value in infos2:
+        full_text = f"{label} : {value}"
+        lines = wrap_text(c, full_text, page_width, font_name="Helvetica", font_size=font_size)
+
+        for i, line in enumerate(lines):
+            if ':' in line:
+                split_index = line.find(":")
+                label_part = line[:split_index + 1]
+                value_part = line[split_index + 1:].lstrip()
+
+                c.setFont("Helvetica-Bold", font_size)
+                c.drawString(x_text, y_text, label_part)
+
+                x_value = x_text + c.stringWidth(label_part, "Helvetica-Bold", font_size) + 2
+                c.setFont("Helvetica", font_size)
+                c.drawString(x_value, y_text, value_part)
+            else:
+                c.setFont("Helvetica", font_size)
+                c.drawString(x_text, y_text, line)
+            y_text -= line_spacing
+
+        y_text -= 4
+
+    # General information on slopes
     y_sous_titre_2 = y_text - ESPACEMENT_SOUS_TITRE
     show_subtitle = True
 
@@ -340,15 +372,10 @@ def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat,
 
         y_sous_titre_2 = page_height - bandeau_height - 1 * cm
 
-    if show_subtitle:
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(marge_gauche, y_sous_titre_2, "Slopes data")
-        y_table = y_sous_titre_2 - 1 * cm  # 1 cm sous le sous-titre
-        show_subtitle = False
-    else:
-        y_table = y_sous_titre_2
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(marge_gauche, y_sous_titre_2, "Slopes data")
 
-    table_data = [["North orientation","Slope (°)", "Uncertainty (°)"]]
+    table_data = [["North orientation", "Slope (°)", "Uncertainty (°)"]]
     angles = list(range(0, 36))
     for angle in angles:
         if angle == 0:
@@ -383,8 +410,6 @@ def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat,
     long_text = "The Topographic Roughness Index (TRI) is a measure used to quantify the ruggedeness or the " \
                 "unevenness of terrain. It reflects how much elevation change over a given area."
 
-    remaining_height = y_sous_titre_tri
-
     # Load image for height calculation
     indice_tri_image_path = f"results/RG{zone}/TRI/TRI_{id}.png"
     with Image.open(indice_tri_image_path) as tri_img:
@@ -397,21 +422,16 @@ def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat,
     line_height = font_size_text + 2
     max_text_width = page_width - marge_gauche - marge_droite
 
-    text_lines_count = (len(long_text) * font_size_text) // max_text_width + 3
-
-    text_height = text_lines_count * line_height
-
     if y_sous_titre_tri < 5 * cm:
         c.showPage()
         banner(c, page_width, page_height, bandeau_height)
 
         y_sous_titre_tri = page_height - bandeau_height - ESPACEMENT_SOUS_TITRE
 
-    # === New part: Topographic profiles ===
+    # TRI
     c.setFont("Helvetica-Bold", 16)
     c.drawString(marge_gauche, y_sous_titre_tri, "Topographic roughness index (TRI)")
 
-    # Justified text under subtitle
     y_text_start = y_sous_titre_tri - ESPACEMENT_SOUS_TITRE
     y_after_text = draw_justified_text(
         c, long_text, marge_gauche, y_text_start,
@@ -433,7 +453,7 @@ def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat,
     c.drawImage(indice_tri_image_path, x_img_tri, y_img_tri, width=img_target_width, height=img_target_height,
                 preserveAspectRatio=True, mask='auto')
 
-    # === New part: Topographic profiles ===
+    # Topographic profiles
     ESPACEMENT_SOUS_TITRE = 1 * cm
 
     estimated_image_height = 5 * cm

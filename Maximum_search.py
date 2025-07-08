@@ -14,7 +14,7 @@ from shapely.geometry import Point, LineString
 
 
 def find_maxima(min_position, min_value, masked_image, out_transform):
-    """
+    '''
     Identifies the local maxima along radial profiles (every 10°) from a minimum point
     on a crater rim. Useful for crater rim profiling and analysis.
 
@@ -25,9 +25,6 @@ def find_maxima(min_position, min_value, masked_image, out_transform):
 
     min_value : float
         Minimum elevation value (crater bottom).
-
-    profile_length : float
-        Length of the radial profile lines.
 
     masked_image : np.ndarray
         3D masked image array (e.g., from a DEM with a shape like [1, height, width]).
@@ -70,7 +67,7 @@ def find_maxima(min_position, min_value, masked_image, out_transform):
     - If a profile is too short (< 4 pixels) or its max is too close to the edge,
       it is skipped.
     - If maximum == minimum, the profile is considered potentially invalid.
-    """
+    '''
     max_values = [0] * 36                               # Stores altitude values for highest_points
     max_coords_relative = [0] * 36                      # Stores relative coordinates of highest_points
     max_coords_real = [0] * 36                          # Stores the actual coordinates of the highest_points
@@ -87,13 +84,14 @@ def find_maxima(min_position, min_value, masked_image, out_transform):
 
     height, width = masked_image.shape[1:3]
 
+    # Beginning of the loop to find 36 maxima
     for a in range(36):
 
         angle_rad = np.deg2rad(angle)
         dx = np.cos(angle_rad)
         dy = np.sin(angle_rad)
 
-        # Calcul du t maximal pour rester dans l'image
+        # Computation of the maximum t to stay on the crater
         t_values = []
 
         if dx != 0:
@@ -114,13 +112,15 @@ def find_maxima(min_position, min_value, masked_image, out_transform):
 
         t_max = min(t_values)
 
+        # Coordinates of the farthest point of the semi-profile
         x1 = int(round(x0 + t_max * dy))
         y1 = int(round(y0 + t_max * dx))
 
-        # Trace la ligne jusqu’au bord de l’image
+        # draw of the semi-profile line
         rr, cc = sk.draw.line(x0, y0, x1, y1)
         half_profiles_coords_relative[(a + 9) % 36] = [rr, cc]
 
+        # Elevation extracting
         profile_values = masked_image[0, rr, cc]
 
         mask = getattr(profile_values, 'mask', np.zeros_like(profile_values, dtype=bool))
@@ -131,6 +131,7 @@ def find_maxima(min_position, min_value, masked_image, out_transform):
 
         angle += 10
 
+        # Only the semi-profile with more than 3 points are selected
         if len(len_without_mask) > 3:
 
             max_val = np.nanmax(profile_values)

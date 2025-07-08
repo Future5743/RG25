@@ -2,31 +2,35 @@
 ##################################################### IMPORTS ##########################################################
 ########################################################################################################################
 
+# Libraries
 import geopandas as gpd
+import numpy as np
 import os
 import shutil
 import rasterio
+from datetime import datetime
 from rasterio.mask import mask
-import numpy as np
 from shapely.geometry import Point, Polygon
 from tqdm import tqdm
-from datetime import datetime
-from Wanted_morph import ask_wanted_morph
-from Maximum_search import find_maxima
-from Circularity import Miller_index
-from Slopes import max_crater_slopes_calculation, slopes_stopar_calculation
-from TRI import TRI
-from Topographical_profiles import main, visualisation3d
-from PDF_report import create_crater_report
 
+# Python files
+from Circularity_and_barycenter import Miller_index, barycenter
+from Maximum_search import find_maxima
+from PDF_report import create_crater_report
+from Slopes import max_crater_slopes_calculation, slopes_stopar_calculation
+from Topographical_profiles import main
+from TRI import TRI
+from Wanted_morph import name_user, ask_wanted_morph, data_recovery
 
 ########################################################################################################################
 ##################################################### DATA OPENING #####################################################
 ########################################################################################################################
 
+# This list contains all the RG that need to be analysed
 zones = [2, 3, 4, 5, 6, 7, 8]
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
+# The values are from README.md files that support DTM
 zone_settings = {
     2: {'pixel_size_tb': 2, 'precision_error': 0.81},
     3: {'pixel_size_tb': 2, 'precision_error': 0.91},
@@ -37,10 +41,16 @@ zone_settings = {
     8: {'pixel_size_tb': 5, 'precision_error': 1.89}
 }
 
-wanted_morph = ask_wanted_morph()
+# User name
+user_initials = name_user()
 
+# Beginning of the process by zone
 for zone in zones:
 
+    # Ask the user what type of study he wants to perform
+    wanted_morph, selected_files = ask_wanted_morph()
+
+    # Recovering the right parameters for the area under study
     try:
         params = zone_settings.get(zone)
         pixel_size_tb = params['pixel_size_tb']
@@ -61,6 +71,28 @@ for zone in zones:
     hiesinger = gpd.read_file(hiesinger_path)
     swirls = gpd.read_file(swirls_path)
 
+    # If the user have chosen to reuse older data, the following extra dataframe are needed
+    global_results_shp = None
+
+    if selected_files is not None:
+        for path in selected_files:
+            if "global" in path:
+                global_results_shp = gpd.read_file(path)
+            elif "centers" in path:
+                centers_shp = gpd.read_file(path)
+            elif "highest" in path:
+                highest_shp = gpd.read_file(path)
+            elif "lowest" in path:
+                lowest_shp = gpd.read_file(path)
+            elif "rim" in path:
+                rim_shp = gpd.read_file(path)
+            elif "slopes" in path:
+                slopes_shp = gpd.read_file(path)
+            else:
+                raise ValueError("You didn't choose the right files : you need all the .shp of your study which only"
+                                 " focused on bowl-shaped craters (global-results, centers, lowest_points, "
+                                 "highest_points, rim and slopes")
+
     # Geometry and ages extraction
     swirls_geom = swirls.geometry
     hiesinger_geom = hiesinger.geometry
@@ -75,8 +107,6 @@ for zone in zones:
 
     lowest_points = []              # Stores the geometry of the lowest points
 
-    profile_90 = []                 # Stores the geometry of the highest points of the ridge every 90°
-
     centers = []                    # Stores the geometry of the centers of each valid crater found by YOLOv5
 
     # LINESTRING geometry
@@ -87,14 +117,8 @@ for zone in zones:
 
     rim_approx = []                 # Stores the geometry resulting from the polygon formed by the highest_points
 
-    # List to store information about a crater's circularity for all selected craters
-    results_circularity = []
-
-    # Geometry of final craters
-    result_geom_select_crat = []
-
-    # List to store the information needed for the final calculation of the dD ratio of each crater
-    results_ratio_dD = []
+    result_geom_select_crat = []    # Stores the geometry of the buffer that is created around the crater center with
+                                    # the mean diameter
 
     # Force full display of a numpy array
     np.set_printoptions(threshold=np.inf, linewidth=np.inf)
@@ -102,18 +126,23 @@ for zone in zones:
 ########################################################################################################################
 ######################################################### CODE #########################################################
 ########################################################################################################################
-    folders = ["profiles", "TRI", "crater_img", "reports"]
-    base_path = f"results/RG{zone}"
 
-    for folder in folders:
-        path = os.path.join(base_path, folder)
-        if os.path.exists(path):
-            try:
-                shutil.rmtree(path)
-            except OSError as e:
-                print(f"Error removing {path}: {e.strerror}")
+    ### --- CLEANING OF THE WORK ENVIRONMENT --- ###
+    # This cleaning is effective only if the user doesn't want to use older data
+    if global_results_shp is None:
+        folders = ["profiles", "TRI", "crater_img", "reports"]
+        base_path = f"results/RG{zone}"
 
-    # Open raster file
+        for folder in folders:
+            path = os.path.join(base_path, folder)
+            if os.path.exists(path):
+                try:
+                    shutil.rmtree(path)
+                except OSError as e:
+                    print(f"Error removing {path}: {e.strerror}")
+
+
+    ### --- OPEN RASTER FILE --- ###
     with rasterio.open(raster_path) as src:
         raster_array = src.read(1)
         no_data_value = src.nodata
@@ -127,9 +156,22 @@ for zone in zones:
             radius = crater.ray_maxdia
             coord_center = (center_x, center_y)
 
-            coord_center_geom = Point(coord_center)
+            # If the crater studied has already been the subject of an earlier study, the data is reused.
+            if global_results_shp is not None:
 
-            # Cut of the DTM with the crater
+                if crater_id in global_results_shp['run_id'].values:
+
+                    data_recovery(global_results_shp, rim_shp, centers_shp, lowest_shp, highest_shp, slopes_shp,
+                                  crater_id, nac_id,
+                                  highest_points, results_slopes, result_geom_select_crat, centers, lowest_points,
+                                  rim_approx)
+
+                    print(f"💾 Data for the crater {crater_id} was recovered from older versions")
+
+                    # All the treatments are already done, we can switch to analyse another crater
+                    continue
+
+            ### --- CUT OF THE DTM WITH THE CRATER GEOMETRY --- ###
             try:
                 out_image, out_transform = mask(src, crater_geom, crop=True)
             except ValueError:
@@ -151,33 +193,36 @@ for zone in zones:
             matches_hiesinger = hiesinger.geometry.contains(crater_center.geometry.iloc[0])
 
             if not matches_hiesinger.any():
-                continue  # No data for this crater
+                continue  # If the crater is not contained in a Hiesinger polygon, it is skipped and thus not studied
 
             floor_age = hiesinger.loc[matches_hiesinger, 'Model_Age'].values[0]
 
             ### --- SWIRL --- ###
             crater_center = crater_center.to_crs(swirls.crs)
             matches_swirl = swirls.geometry.contains(crater_center.geometry.iloc[0])
-            swirl_on_or_off = 'on-swirl' if matches_swirl.any() else 'off-swirl'
+            swirl_on_or_off = 'on-swirl' if matches_swirl.any() else 'off-swirl'    # Assigning the on or off swirl data
 
             ### --- LOW ELEVATION --- ###
             if masked_image.count() > 0:
-                min_val = round(masked_image.min(), 4)
-                min_pos = np.unravel_index(masked_image.argmin(), masked_image.shape)
+                min_val = round(masked_image.min(), 4)                                  # Lowest elevation encountered
+                min_pos = np.unravel_index(masked_image.argmin(), masked_image.shape)   # Relative coordinates of the
+                                                                                        # lowest point
 
             ### --- HIGH ELEVATION --- ###
 
-            (lowest_point_coord,
-             min_geom,
-             not_enough_data,
-             max_value,
-             max_coord_relative,
-             max_coord_real,
+            (lowest_point_coord,                                                        # Finding of the points with the
+             min_geom,                                                                  # highest elevation every 10°
+             not_enough_data,                                                           # around the point with the
+             max_value,                                                                 # lowest elevation
+             max_coord_relative,                                                        # Also stores teh semi-profiles
+             max_coord_real,                                                            # for future treatments
              max_geom,
              demi_profiles_value,
              demi_profiles_coords_relatives
              ) = find_maxima(min_pos, min_val, masked_image, out_transform)
 
+            # First condition: the crater must have 36 semi-profile (so not near the edge of the DTM) and each
+            # semi-profiles can't be cut with no data
             if len(max_geom) == 36 and not_enough_data == 0:
 
                 print("✅ The maximum points calculation done")
@@ -213,30 +258,6 @@ for zone in zones:
 
                 ### --- BARYCENTER --- ###
 
-                def barycenter(points):
-                    n = len(points)
-
-                    A = 0
-                    Cx = 0
-                    Cy = 0
-
-                    for i in range (n):
-                        x0, y0 = points[i]
-                        x1, y1 = points[(i+1) % n]
-                        cross = x0 * y1 - x1 * y0
-                        A += cross
-                        Cx += (x0 + x1) * cross
-                        Cy += (y0 + y1) * cross
-                    A = A * 0.5
-
-                    if A == 0:
-                        raise ValueError("The polygon area is null")
-
-                    Cx /= (6 * A)
-                    Cy /= (6 * A)
-
-                    return Cx, Cy
-
                 x_bary, y_bary = barycenter(max_coord_real)
 
                 dist_lowest_point_center = np.sqrt(
@@ -246,6 +267,8 @@ for zone in zones:
 
                 geom_bary = Point([x_bary, y_bary])
 
+                # Second condition: the crater must have a diameter of at least 40m and the distance between his
+                # barycenter and his minimum elevation has to be less than a quarter of the mean diameter
                 if dist_lowest_point_center < moy_diam * 0.25 and moy_diam >= 40:
 
                     ### --- CIRCULARITY --- ###
@@ -254,12 +277,17 @@ for zone in zones:
 
                     print("✅ Circularity calculation done")
 
+                    # Third condition: the crater must have a circularity of at least 0.9.
+                    # For reminder, if a geometry have a Miller index of 1, it is circular, and if 0 it is far from
+                    # circular
                     if 0.90 <= circularity <= 1:
 
-                        ### --- SLOPES --- ###
+                        ### --- MAX SLOPE BETWEEN TWO OPPOSITE POINTS ON THE RIM --- ###
 
                         max_slope_crater = max_crater_slopes_calculation(max_value, max_coord_relative, pixel_size_tb)
 
+                        # Fourth condition: the maximum slope between two opposite points on the rim must be less than
+                        # 8° (Stopar et al., 2017)
                         if max_slope_crater < 8:
 
                             print(f"✅ The maximum slope between to opposite point on the rim is {max_slope_crater}")
@@ -268,7 +296,7 @@ for zone in zones:
 
                             depth = [x - min_val for x in max_value]
 
-                            prof_moyen_crat = round(np.mean(depth), 3)
+                            mean_crat_depth = round(np.mean(depth), 3)
 
                             sigma = np.sqrt(precision_error ** 2 + np.std(depth) ** 2)
                             delta_d_hoover = sigma / np.sqrt(N)  # Hoover et al., 2024
@@ -286,6 +314,9 @@ for zone in zones:
                                                                                       min_val,
                                                                                       wanted_morph)
 
+                            # Fith condition: if a crater is labeled with an "Other" morphology, it is not studied
+                            # anymore. A crater can be attributed this morphology only when the algorithm is run for
+                            # "Bowl-shaped only" morphology
                             if crater_morph != "Other":
 
                                 ### --- CREATION OF A CIRCLE ADJUSTED TO CRATER DIMENSIONS --- ###
@@ -300,56 +331,48 @@ for zone in zones:
 
                                 ### --- d/D CALCULATION --- ###
 
-                                ratio_dD = round(prof_moyen_crat / moy_diam, 3)
+                                ratio_dD = round(mean_crat_depth / moy_diam, 3)
 
                                 # d/D UNCERTAINTIES CALCULATION
-
-                                ## Hoover et al., 2024
-                                rel_err_prof_hoover = delta_d_hoover / prof_moyen_crat
+                                # The mathematical formula is obtained by the uncertainty propagation formula
+                                rel_err_prof_hoover = delta_d_hoover / mean_crat_depth
                                 rel_err_diam_hoover = delta_D_hoover / moy_diam
                                 rel_err_ratio_hoover = np.sqrt(rel_err_prof_hoover ** 2 + rel_err_diam_hoover ** 2)
                                 delta_dD_hoover = round(rel_err_ratio_hoover * ratio_dD, 3)
 
                                 print("✅ d/D done")
 
-                                ### Add geometry from highest_points
-                                rim_approx_geom = Polygon(max_coord_real)
-
                                 ### --- TRI ALGORITHM --- ###
+                                # The formula is taken from Argwal et al., 2019
                                 TRI_mean_crest = TRI(center_x, center_y, radius, src, no_data_value, pixel_size_tb,
                                                      crater_id, zone, craters.crs, max_coord_real)
 
                                 print("✅ TRI done")
 
+                                ### --- SLOPES CALCULATION --- ###
+                                # The method is taken from Stopar et al., 2017
                                 (
                                     slopes_stopar,
                                     slopes_stopar_geom,
                                     mean_slope_stopar,
-                                    delta_stopar,
-                                    rim_height,
-                                    reliability_rim_height
+                                    delta_stopar
                                 ) = slopes_stopar_calculation(
                                     demi_profiles_value,
                                     demi_profiles_coords_relatives,
-                                    max_coord_real,
-                                    max_value,
                                     point_inner,
                                     idx_inner,
                                     crater_floor,
                                     pixel_size_tb,
                                     precision_error,
                                     out_transform,
-                                    no_data_value,
-                                    zone
+                                    no_data_value
                                 )
 
                                 print("✅ Slopes calculation done")
 
-                                ### --- SLOPES CALCULATION --- ###
-
-                                visualisation3d(masked_image, crater_id, zone, swirl_on_or_off)
-
-                                ### --- AUTOMATIC CLASSIFICATION --- ###
+                                ### --- AUTOMATIC CLASSIFICATION OF THE ESTIMATED STATE OF DETERIORATION --- ###
+                                # The criteria for the estimation of the degradation state are taken from
+                                # Basilevsky et al., 1976
 
                                 state = "Unknown"
                                 slope_max = np.max(slopes_stopar)
@@ -375,7 +398,7 @@ for zone in zones:
 
                                 print(f"〽️Degradation : {state}")
 
-                                ### --- REPORT --- ###
+                                ### --- PDF REPORT CREATION --- ###
                                 create_crater_report(crater_id,
                                                      zone,
                                                      swirl_on_or_off,
@@ -386,26 +409,29 @@ for zone in zones:
                                                      lowest_point_coord,
                                                      moy_diam,
                                                      round(delta_D_hoover, 0),
-                                                     prof_moyen_crat,
+                                                     mean_crat_depth,
                                                      round(delta_d_hoover, 1),
                                                      ratio_dD,
                                                      delta_dD_hoover,
                                                      circularity,
                                                      mean_slope_stopar,
                                                      slopes_stopar,
-                                                     delta_stopar
+                                                     delta_stopar,
+                                                     TRI_mean_crest
                                                      )
 
+                                ### --- DATA INPUT FOR SHAPEFILEs CREATION --- ###
                                 # Commune attributes
                                 common_attrs = {
                                     'run_id': crater_id,
                                     'NAC_DTM_ID': nac_id
                                 }
 
-                                # Line (profiles)
+                                # For angle related data
                                 angle = 0
                                 for i, geom in enumerate(max_geom):
 
+                                    # Inputs for the highest points focused Shapefile
                                     highest_points.append({
                                         'geometry': max_geom[i],
                                         **common_attrs,
@@ -415,22 +441,19 @@ for zone in zones:
                                         'position': f'Point à {angle}°'
                                     })
 
+                                    # Inputs for the slope focused Shapefile
                                     results_slopes.append({
                                         'geometry': slopes_stopar_geom[i],
                                         **common_attrs,
                                         'position': f'Ligne à {angle}°',
-                                        'slopeStopar': slopes_stopar[i],
+                                        'slopeStopa': slopes_stopar[i],
                                         'δStopar': delta_stopar[i],
-                                        'meanStopar': mean_slope_stopar,
-                                        "rim_height": rim_height[i],
-                                        "reliability": reliability_rim_height[i],
-                                        "mean_rim_h": np.mean(rim_height),
-                                        "mean_reliab": np.mean(reliability_rim_height)
+                                        'meanStopar': mean_slope_stopar
                                     })
 
                                     angle += 10
 
-                                # Crater's center
+                                # Inputs for the centers focused Shapefile
                                 centers.append({
                                     'geometry': geom_bary,
                                     **common_attrs,
@@ -438,7 +461,7 @@ for zone in zones:
                                     'center_lat': y_bary
                                 })
 
-                                # Lowest point
+                                # Inputs for the lowest points focused Shapefile
                                 lowest_points.append({
                                     'geometry': min_geom,
                                     **common_attrs,
@@ -446,13 +469,13 @@ for zone in zones:
                                     'position': lowest_point_coord
                                 })
 
-                                # Approximative rim
+                                # Inputs for the rim focused Shapefile
                                 rim_approx.append({
-                                    'geometry': rim_approx_geom,
+                                    'geometry': Polygon(max_coord_real),
                                     **common_attrs
                                 })
 
-                                # Crater's metadata
+                                # Inputs for the general-results Shapefile
                                 result_geom_select_crat.append({
                                     'geometry': buf_diam_max,
                                     **common_attrs,
@@ -463,15 +486,13 @@ for zone in zones:
                                     'ray_maxdia': ray_largest_diam,
                                     'mean_diam': int(moy_diam),
                                     'δ_D': round(delta_D_hoover, 0),
-                                    'mean_depth': round(prof_moyen_crat, 1),
-                                    'δ_d': round(delta_d_hoover, 1),
+                                    'mean_depth': round(mean_crat_depth, 1),
+                                    'δ_d_1': round(delta_d_hoover, 1),
                                     'ratio_dD': ratio_dD,
                                     'δ_dD': delta_dD_hoover,
                                     'circu': circularity,
                                     'mean_slope': mean_slope_stopar,
-                                    'mean TRI': TRI_mean_crest,
-                                    "mean_rim_h": np.mean(rim_height),
-                                    "mean_reliab": np.mean(reliability_rim_height),
+                                    'mean TRI': round(TRI_mean_crest, 2),
                                     'swirl': swirl_on_or_off,
                                     'hiesinger': floor_age
                                 })
@@ -497,21 +518,22 @@ for zone in zones:
 ##################################################### RESULTS DATA #####################################################
 ########################################################################################################################
 
+    # date of the day
     date = datetime.today().strftime("%Y%m%d")
 
     # List of the wanted shapefiles
     shapefile_data = [
-        (result_geom_select_crat,       f'{date}_RGdD_AL_global-results_v1'),
-        (rim_approx,                    f'{date}_RGdD_AL_rim_v1'),
-        (results_slopes,                f'{date}_RGdD_AL_slopes_v1'),
-        (highest_points,                f'{date}_RGdD_AL_highest-points_v1'),
-        (lowest_points,                 f'{date}_RGdD_AL_lowest_points_v1'),
-        (centers,                       f'{date}_RGdD_AL_centers_v1')
+        (result_geom_select_crat,       f'{date}_RGdD_{user_initials}_global_results_v1'),
+        (rim_approx,                    f'{date}_RGdD_{user_initials}_rim_v1'),
+        (results_slopes,                f'{date}_RGdD_{user_initials}_slopes_v1'),
+        (highest_points,                f'{date}_RGdD_{user_initials}_highest_points_v1'),
+        (lowest_points,                 f'{date}_RGdD_{user_initials}_lowest_points_v1'),
+        (centers,                       f'{date}_RGdD_{user_initials}_centers_v1')
     ]
-    # Création et export des GeoDataFrames
+
+    # Creation et export of GeoDataFrames
     for data, filename in shapefile_data:
         gdf = gpd.GeoDataFrame(data, crs=craters.crs)
         shapefile_path = f'results/RG{zone}/{filename}.shp'
         gdf.to_file(shapefile_path)
-
 

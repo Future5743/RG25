@@ -77,11 +77,6 @@ You must download NAC DTM datasets from the [LROC DTM Portal](https://wms.lroc.a
     │   ├── NAC_DTM_REINER2.tiff
     │   ├── NAC_DTM_REINER3.tiff
     │   └── ...
-    ├── DTM_interpolate
-    │   └── Linear
-    │       ├── RG2_linar_interpolation_crop.TIF
-    │       ├── RG2_linear_interpolation_fiabilite_crop.TIF
-    │       └── ...
     └── Orthophoto
         ├── Othophoto_RG2.tiff
         ├── Othophoto_RG3.tiff
@@ -95,12 +90,13 @@ You must download NAC DTM datasets from the [LROC DTM Portal](https://wms.lroc.a
 │   └── Centers/
 ├── results/
 ├── main.py
-├── Circularity.py
-├── Graph_dtoD.py
+├── Circularity_and_barycenter.py
 ├── Maximum_search.py
+├── PDF_report.py
 ├── Slopes.py
 ├── TRI.py
 ├── Topographical_profiles.py
+├── Wanted_morph.py
 └── README.md
 ```
 
@@ -134,21 +130,23 @@ The results folder is organized that way :
     ├── 📁 crater_img    -- This folder contains images of the DEM of the craters
     ├── 📁 profiles      -- This folder contains the craters profiles of RGi  
     ├── 📁 reports       -- This folder contains reports on the craters studied of RGi
-    └── 📁 TRI           -- This folder contains the TRI images and GeoTiff of the craters of RGi  
+    └── 📁 TRI           -- This folder contains the TRI images and GeoTiff of the craters of RGi 
 
 ```
 
 ### 🐍 Python Scripts
 
-| Script                     | Description                                                |
-|----------------------------|------------------------------------------------------------|
-| `main.py`                  | Main execution pipeline calling all components             |
-| `Circularity.py`           | Computes crater circularity index                          |
-| `Graph_dtoD.py`            | Plots depth/diameter trends with uncertainty               |
-| `Maximum_search.py`        | Finds max elevation at 10° intervals around crater rims     |
-| `Slopes.py`                | Calculates slope angles of crater rims                     |
-| `TRI.py`                   | Computes terrain ruggedness index                          |
-| `Topographical_profiles.py`| Generates radial topographic profiles                      |
+| Script                          | Description                                                              |
+|---------------------------------|--------------------------------------------------------------------------|
+| `main.py`                       | Main execution pipeline calling all components                           |
+| `Circularity_and_barycenter.py` | Computes crater circularity index and barycenter                         |
+| `Maximum_search.py`             | Finds max elevation at 10° intervals around crater rims                  |
+| `PDf_report.py`                 | Generates a pdf report for every crater                                  |
+| `Slopes.py`                     | Calculates slope angles of crater rims                                   |
+| `Topographical_profiles.py`     | Generates radial topographic profiles                                    |
+| `TRI.py`                        | Computes terrain ruggedness index                                        |
+| `Wanted_morph`                  | Ask the user what morphology he wants to study (all or bowl-shaped only) |
+
 
 ---
 
@@ -157,18 +155,19 @@ The results folder is organized that way :
 All generated files are saved in `results/RG{zone}/`, including:
 
 - **Shapefiles**:
-  - `0_results_global_RG{zone}.shp`: Crater classification and morphometry
-  - `1_results_rim_RG{zone}.shp`: Rim approximation
-  - `2_results_slopes_RG{zone}.shp`: Rim slopes
-  - `3_results_max_RG{zone}.shp`: Max elevation points
-  - `4_results_low_RG{zone}.shp`: Lowest floor points
-  - `5_results_centers_RG{zone}.shp`: Crater centers
-
+  - `YYMMDD_RGdD_userInitials_centers_v1.shp`: Crater centers
+  - `YYMMDD_RGdD_userInitials_global_results_v1.shp`: Crater classification and morphometry
+  - `YYMMDD_RGdD_userInitials_highest_points_v1.shp`: Max elevation points
+  - `YYMMDD_RGdD_userInitials_lowest_points_v1.shp`: Lowest floor points
+  - `YYMMDD_RGdD_userInitials_rim_v1.shp`: Rim approximation
+  - `YYMMDD_RGdD_userInitials_slopes_v1.shp`: Rim slopes
+  
 
 - **Visuals**:
   - PDF reports per crater in `/reports/`
   - TRI rasters in `/TRI/`
   - Profile plots in `/profiles/`
+  - Picture in `/crater_img/`
 
 ---
 
