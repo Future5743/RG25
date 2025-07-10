@@ -27,7 +27,7 @@ from Wanted_morph import name_user, ask_wanted_morph, data_recovery
 ########################################################################################################################
 
 # This list contains all the RG that need to be analysed
-zones = [2]
+zones = [2, 3, 4, 5, 6, 7, 8]
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 # The values are from README.md files that support DTM
