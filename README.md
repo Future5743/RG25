@@ -16,7 +16,7 @@ For each crater, the pipeline performs:
 3. **Calculate rim and interior slopes**
 4. **Estimate terrain roughness using TRI (Terrain Ruggedness Index)**
 5. **Generate a fitted crater buffer**
-6. **Classify crater degradation (Classes: A, AB, B, C)**
+6. **Estimate approximately crater degradation (Classes: A, AB, B, C)**
 7. **Generate a detailed PDF report per crater**
 8. **Export results as shapefiles and visual outputs**
 
@@ -32,26 +32,28 @@ Install dependencies using either `conda` or `pip`.
 
 - **Using Anaconda:**
   ```bash
-  conda install geopandas matplotlib numpy rasterio shapely tqdm scikit-learn scikit-image scipy reportlab
+  conda install geopandas matplotlib numpy pillow rasterio reportlab shapely scikit-image scikit-learn scipy tkinter tqdm
   ```
 
 - **Using pip:**
   ```bash
-  pip install geopandas matplotlib numpy rasterio shapely tqdm scikit-learn scikit-image scipy reportlab
+  pip install geopandas matplotlib numpy pillow rasterio reportlab shapely scikit-image scikit-learn scipy tkinter tqdm
   ```
 
-| Library        | Version  | Documentation                                           |
-|----------------|----------|----------------------------------------------------------|
-| geopandas      | v1.0.1   | [Docs](https://geopandas.org/en/stable/docs.html)        |
-| matplotlib     | v3.10.0  | [Docs](https://matplotlib.org/stable/index.html)         |
-| numpy          | v1.26.4  | [Docs](https://numpy.org/doc/1.26/)                      |
-| rasterio       | v1.4.3   | [Docs](https://rasterio.readthedocs.io/en/latest/)       |
-| shapely        | v2.0.6   | [Docs](https://shapely.readthedocs.io/en/stable/)        |
-| tqdm           | v4.67.1  | [PyPI](https://pypi.org/project/tqdm/)                   |
-| scikit-learn   | v1.5.1   | [Docs](https://scikit-learn.org/stable/)                 |
-| scikit-image   | v0.25.0  | [Docs](https://scikit-image.org/docs/stable/)            |
-| scipy          | v1.13.1  | [Docs](https://docs.scipy.org/doc/scipy/)                |
-| reportlab      | v3.6.13  | [PyPI](https://pypi.org/project/reportlab/)              |
+| Library      | Version | Documentation                                                        |
+|--------------|---------|----------------------------------------------------------------------|
+| geopandas    | v1.0.1  | [Docs](https://geopandas.org/en/stable/docs.html)                    |
+| matplotlib   | v3.10.0 | [Docs](https://matplotlib.org/stable/index.html)                     |
+| numpy        | v1.26.4 | [Docs](https://numpy.org/doc/1.26/)                                  |
+| pillow       | v10.4.0 | [Docs](https://pillow.readthedocs.io/en/stable/reference/Image.html) |
+| rasterio     | v1.4.3  | [Docs](https://rasterio.readthedocs.io/en/latest/)                   |
+| reportlab    | v3.6.13 | [PyPI](https://pypi.org/project/reportlab/)                          |
+| shapely      | v2.0.5  | [Docs](https://shapely.readthedocs.io/en/stable/)                    |
+| scikit-image | v0.25.0 | [Docs](https://scikit-image.org/docs/stable/)                        |
+| scikit-learn | v1.5.1  | [Docs](https://scikit-learn.org/stable/)                             |
+| scipy        | v1.15.3 | [Docs](https://docs.scipy.org/doc/scipy/)                            |
+| tkinter      | v8.6.14 | [Docs](https://docs.python.org/3/library/tkinter.html)                                                             |
+| tqdm         | v4.67.1 | [PyPI](https://pypi.org/project/tqdm/)                               |
 
 ---
 
@@ -106,7 +108,7 @@ You must download NAC DTM datasets from the [LROC DTM Portal](https://wms.lroc.a
 
 ### 📁 Key Folders
 
-- `data/`: Contains input shapefiles and downloaded DTM data.
+- `data/`: Contains input shapefiles.
 - `results/`: Output folders for crater images, reports, shapefiles, and TRI calculations.
 - `logo/`: Optional branding assets.
 
