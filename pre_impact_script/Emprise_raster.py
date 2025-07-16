@@ -61,5 +61,3 @@ def raster_to_valid_extent_shapefile(raster_path, shapefile_path):
             })
 
     print(f"Shapefile enregistré : {shapefile_path}")
-
-raster_to_valid_extent_shapefile(f"../../data/RG/DTM/NAC_DTM_REINER8.tiff", f"../../data/RG/DTM/Emprises/emprise_RG8.shp")

@@ -781,7 +781,7 @@ def process_profiles_and_plot(demi_profiles_value, demi_profiles_coords_relative
 
         def set_morph_to_Unknown(event):
             nonlocal crater_morph
-            crater_morph = "Unknown"
+            crater_morph = "Unknown morphology"
             plt.close()
 
         # Plot profiles centered on their minimum elevation point

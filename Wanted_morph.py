@@ -106,61 +106,60 @@ def ask_wanted_morph():
     root.mainloop()
 
     # Step 2 — Follow-up question
-    if choice[0] == "All":
-        def choose_yes():
-            bowl_processed.append("Yes")
-            second_root.destroy()
+    def choose_yes():
+        bowl_processed.append("Yes")
+        second_root.destroy()
 
-        def choose_no():
-            bowl_processed.append("No")
-            second_root.destroy()
+    def choose_no():
+        bowl_processed.append("No")
+        second_root.destroy()
 
-        second_root = tk.Tk()
-        second_root.title("Follow-up")
-        second_root.geometry("450x150")
-        second_root.resizable(False, False)
+    second_root = tk.Tk()
+    second_root.title("Follow-up")
+    second_root.geometry("450x150")
+    second_root.resizable(False, False)
 
-        label2 = tk.Label(second_root, text="Have you already processed this zone",
-                          font=("Arial", 12), wraplength=400)
-        label2.pack(pady=10)
+    label2 = tk.Label(second_root, text="Have you already processed this zone",
+                      font=("Arial", 12), wraplength=400)
+    label2.pack(pady=10)
 
-        bouton_frame2 = tk.Frame(second_root)
-        bouton_frame2.pack(pady=10)
+    bouton_frame2 = tk.Frame(second_root)
+    bouton_frame2.pack(pady=10)
 
-        btn_yes = tk.Button(bouton_frame2, text="Yes", width=15, command=choose_yes)
-        btn_no = tk.Button(bouton_frame2, text="No", width=15, command=choose_no)
+    btn_yes = tk.Button(bouton_frame2, text="Yes", width=15, command=choose_yes)
+    btn_no = tk.Button(bouton_frame2, text="No", width=15, command=choose_no)
 
-        btn_yes.grid(row=0, column=0, padx=15)
-        btn_no.grid(row=0, column=1, padx=15)
+    btn_yes.grid(row=0, column=0, padx=15)
+    btn_no.grid(row=0, column=1, padx=15)
 
-        second_root.mainloop()
+    second_root.mainloop()
 
-        # Step 3 — File selection window
-        if bowl_processed[0] == "Yes":
-            def browse_files():
-                files = filedialog.askopenfilenames(
-                    title="Select the 6 shapefiles of the latest study",
-                    filetypes=[("Shapefiles", "*.shp"), ("All files", "*.*")]
-                )
-                if files:
-                    selected_files.extend(files)
-                third_root.destroy()
+    # Step 3 — File selection window
+    if bowl_processed[0] == "Yes":
+        def browse_files():
+            files = filedialog.askopenfilenames(
+                title="Select the 6 shapefiles of the latest study",
+                filetypes=[("Shapefiles", "*.shp"), ("All files", "*.*")]
+            )
+            if files:
+                selected_files.extend(files)
+            third_root.destroy()
 
-            third_root = tk.Tk()
-            third_root.title("Choose your files")
-            third_root.geometry("500x180")
-            third_root.resizable(False, False)
+        third_root = tk.Tk()
+        third_root.title("Choose your files")
+        third_root.geometry("500x180")
+        third_root.resizable(False, False)
 
-            msg = "Choose your files.\n \n " \
-                  "⚠️Be careful, you need to choose the 6 shapefiles (centers, global-results, highest_points, " \
-                  "lowest_points, rim, slopes)"
-            label3 = tk.Label(third_root, text=msg, font=("Arial", 12), wraplength=480, justify="center")
-            label3.pack(pady=20)
+        msg = "Choose your files.\n \n " \
+              "⚠️Be careful, you need to choose the 6 shapefiles (centers, global-results, highest_points, " \
+              "lowest_points, rim, slopes)"
+        label3 = tk.Label(third_root, text=msg, font=("Arial", 12), wraplength=480, justify="center")
+        label3.pack(pady=20)
 
-            btn_browse = tk.Button(third_root, text="📁 Choose files", command=browse_files, width=20)
-            btn_browse.pack(pady=10)
+        btn_browse = tk.Button(third_root, text="📁 Choose files", command=browse_files, width=20)
+        btn_browse.pack(pady=10)
 
-            third_root.mainloop()
+        third_root.mainloop()
 
     return choice[0], selected_files if selected_files else None
 
@@ -227,9 +226,6 @@ def data_recovery(global_results_shp, rim_shp, centers_shp, lowest_shp, highest_
     matched_row_lowest = lowest_shp[lowest_shp['run_id'] == crater_id]
     matched_row_highest = highest_shp[highest_shp['run_id'] == crater_id]
     matched_row_slopes = slopes_shp[slopes_shp['run_id'] == crater_id]
-
-    print(crater_id)
-    print(matched_row_rim)
 
     row_global = matched_row_global.iloc[0]
     row_rim = matched_row_rim.iloc[0]

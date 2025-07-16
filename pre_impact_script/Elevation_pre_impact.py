@@ -100,24 +100,24 @@ def interpolation_dtm(input_raster_path, output_raster_path, method='linear', sm
     print(f"📊 Carte de fiabilité sauvegardée dans : {fiabilite_path}")
 
 zones = [2,3,4,5,6,7,8]
+methods = ['cubic']
 
 for zone in zones:
 
-    interpolation_dtm(
-        input_raster_path=f"../../data/RG/DTM_crop/RG{zone}_clip_02.TIF",
-        output_raster_path=f"../../data/RG/DTM_interpolate/Linear/RG{zone}_linear_interpolation.TIF",
-        method='linear',
-        smooth=True,
-        sigma=1
-    )
+    for method in methods:
+        interpolation_dtm(
+            input_raster_path=f"../../data/RG/DTM_crop/RG{zone}_clip_02.TIF",
+            output_raster_path=f"../../data/RG/DTM_interpolate/{method}/RG{zone}_{method}_interpolation.TIF",
+            method=method,
+            smooth=True,
+            sigma=1
+        )
 
-    crop(raster_path=f"../../data/RG/DTM_interpolate/Linear/RG{zone}_linear_interpolation.TIF",
-        shapefile_path=f"../../data/RG/DTM/Emprises/emprise_RG{zone}.shp",
-        output_path=f"../../data/RG/DTM_interpolate/Linear/RG{zone}_linear_interpolation_crop.TIF")
+        crop(raster_path=f"../../data/RG/DTM_interpolate/{method}/RG{zone}_{method}_interpolation.TIF",
+            shapefile_path=f"../../data/RG/DTM/Emprises/emprise_RG{zone}.shp",
+            output_path=f"../../data/RG/DTM_interpolate/{method}/RG{zone}_{method}_interpolation_crop.TIF")
 
-    crop(raster_path=f"../../data/RG/DTM_interpolate/Linear/RG{zone}_linear_interpolation_fiabilite.TIF",
-        shapefile_path=f"../../data/RG/DTM/Emprises/emprise_RG{zone}.shp",
-        output_path=f"../../data/RG/DTM_interpolate/Linear/RG{zone}_linear_interpolation_fiabilite_crop.TIF")
-
-
+        crop(raster_path=f"../../data/RG/DTM_interpolate/{method}/RG{zone}_{method}_interpolation_fiabilite.TIF",
+            shapefile_path=f"../../data/RG/DTM/Emprises/emprise_RG{zone}.shp",
+            output_path=f"../../data/RG/DTM_interpolate/{method}/RG{zone}_{method}_interpolation_fiabilite_crop.TIF")
 

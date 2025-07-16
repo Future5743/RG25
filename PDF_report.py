@@ -2,6 +2,8 @@
 ##################################################### IMPORTATIONS #####################################################
 ########################################################################################################################
 import os
+
+import numpy as np
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
@@ -180,7 +182,7 @@ def banner(c, page_width, page_height, bandeau_height):
 
 def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat, coord_low,
                           diam, incer_D_hoov, d, incer_d_hoov,
-                          dtoD, incer_dD_hoov, mill, mean_slope, slope, delta_slope, TRI_mean_crest):
+                          dtoD, incer_dD_hoov, mill, slope, delta_slope, TRI_mean_crest):
     """
     Generates a multi-page PDF report for a crater, including:
     - Header and logos
@@ -305,7 +307,7 @@ def create_crater_report(id, zone, swirl, morph, state, center_long, center_lat,
         ("Mean depht", f"{'%.1f' % round(d, 1)}m ± {incer_d_hoov}m"),
         ("d/D ratio", f"{dtoD} ± {incer_dD_hoov}"),
         ("Circularity index", f"{mill}"),
-        ("Mean slope", f"{mean_slope}°"),
+        ("Slope", f"Between {np.min(slope)}° et {np.max(slope)}°"),
         ("Mean value of TRI on the rim crest", f"{'%.2f' % round(TRI_mean_crest, 2)}")
     ]
 

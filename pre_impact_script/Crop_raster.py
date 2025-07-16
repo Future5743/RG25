@@ -34,6 +34,3 @@ def crop(raster_path, shapefile_path, output_path):
     # Sauvegarder le raster découpé
     with rasterio.open(output_path, "w", **out_meta) as dest:
         dest.write(out_image)
-
-crop(f"../../data/RG/DTM/NAC_DTM_REINER8.tiff", "../../data/RG/DTM_crop/Emprises/Emprises_RG8.shp",
-     "../../data/RG/DTM_crop/RG8_clip.TIF")

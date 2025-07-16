@@ -27,7 +27,7 @@ from Wanted_morph import name_user, ask_wanted_morph, data_recovery
 ########################################################################################################################
 
 # This list contains all the RG that need to be analysed
-zones = [2, 3, 4, 5, 6, 7, 8]
+zones = [6]
 
 # Definition of the pixel size and of the vertical precision error for each zone (DTM)
 # The values are from README.md files that support DTM
@@ -280,7 +280,7 @@ for zone in zones:
                     # Third condition: the crater must have a circularity of at least 0.9.
                     # For reminder, if a geometry have a Miller index of 1, it is circular, and if 0 it is far from
                     # circular
-                    if 0.98 <= circularity <= 1:
+                    if 0.90 <= circularity <= 1:
 
                         ### --- MAX SLOPE BETWEEN TWO OPPOSITE POINTS ON THE RIM --- ###
 
@@ -414,7 +414,6 @@ for zone in zones:
                                                      ratio_dD,
                                                      delta_dD_hoover,
                                                      circularity,
-                                                     mean_slope_stopar,
                                                      slopes_stopar,
                                                      delta_stopar,
                                                      TRI_mean_crest
